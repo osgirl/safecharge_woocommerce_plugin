@@ -1,0 +1,13 @@
+###################################################
+# Gate2shop WooCommerce Payment Module / ver. 1.1
+# 
+# 2018-08
+###################################################
+
+1. Copy the content of the arhive file in wp-content/plugins/. The plugins folder must be woocommerce-g2s
+2. Login in the backend
+3. Navigate to Plugins and install 'WooCommerce SafeCharge Gateway'
+4. Navigate to WooCommerce -> Settings -> Payments (Checkout) -> SafeCharge 
+5. Enter your merchant G2S credentails and activate the plugin
+6. For test purpose please use check 'Enable test mode'
+7. All merchant payment options set up for a country will be visible on the front-end
