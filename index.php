@@ -10,7 +10,7 @@ Author URI:http://safecharge.com
 
 if(!defined('ABSPATH'))
 {
-    $die = file_get_contents(plugin_dir_path( __FILE__ ) . 'die.html');
+    $die = file_get_contents(dirname( __FILE__ ) . DIRECTORY_SEPARATOR . 'die.html');
     echo $die;
     die;
 }
@@ -39,8 +39,9 @@ function woocommerce_add_sc_gateway($methods)
     return $methods;
 }
 
+// we come here after DMN redirect
 function sc_enqueue($hook)
-{	
+{
     include_once("token.php");
     
     $timestamp= time();
