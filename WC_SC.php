@@ -180,12 +180,8 @@ class WC_SC extends WC_Payment_Gateway
      **/
     function receipt_page($order_id)
     {
-       $order = new WC_Order($order_id);
-       
-       $order->add_order_note("User is redicted to Safecharge Payment page");
-       $order->save();
-       
-       echo  $this -> generate_sc_form($order_id);
+    //   echo  $this -> generate_sc_form($order_id);
+       $this -> generate_sc_form($order_id);
     }
 
 	 /**
@@ -197,6 +193,9 @@ class WC_SC extends WC_Payment_Gateway
         
 		$TimeStamp = date('Ymdhis');
         $order = new WC_Order($order_id);
+        
+        $order->add_order_note("User is redicted to Safecharge Payment page");
+        $order->save();
         
 		$items = $order->get_items();
 		$item_price=0;
@@ -296,11 +295,9 @@ class WC_SC extends WC_Payment_Gateway
             $params_array[] = "<input type='hidden' name='$key' value='$value'/>";
         }
         
-        
         $this->create_log($params, 'Order params');
         
-        // i tried to move this html in template file but then there is problem with loading payment form
-        return
+        echo
             '<form action="'.$this -> URL.'" method="post" id="sc_payment_form">'
                 .implode('', $params_array)
                 .'<noscript>'
@@ -332,9 +329,7 @@ class WC_SC extends WC_Payment_Gateway
     function process_payment($order_id)
     {
         $order = new WC_Order($order_id);
-        $order->add_order_note("User returned from Safecharge Payment page");
-        $order->save();
-        
+       
         return array(
             'result' 	=> 'success',
             'redirect'	=> SC_Versions_Resolver::get_redirect_url($order),
@@ -343,7 +338,11 @@ class WC_SC extends WC_Payment_Gateway
 
 	function sc_checkout_process()
     {
-		$_SESSION['sc_subpayment']= $_POST['payment_method_sc'];
+        $_SESSION['sc_subpayment'] = '';
+        if(isset($_POST['payment_method_sc'])) {
+            $_SESSION['sc_subpayment'] = $_POST['payment_method_sc'];
+        }
+        
 		return true;
 	}
 
@@ -481,12 +480,16 @@ class WC_SC extends WC_Payment_Gateway
 
 	function checkAdvancedCheckSum()
     {
-		$str = md5($this->secret.$_GET['totalAmount'].$_GET['currency']
-            .$_GET['responseTimeStamp'].$_GET['PPP_TransactionID'].$_GET['Status'].$_GET['productId']);
-        
-		if ($str == $_GET['advanceResponseChecksum'])
-			return true;
-		else
+        if (isset($_GET['advanceResponseChecksum'])){
+            $str = md5($this->secret.$_GET['totalAmount'].$_GET['currency']
+                .$_GET['responseTimeStamp'].$_GET['PPP_TransactionID'].$_GET['Status'].$_GET['productId']);
+
+            if ($str == $_GET['advanceResponseChecksum'])
+                return true;
+            else
+                return false;
+        }
+        else
             return false;
 	}
     

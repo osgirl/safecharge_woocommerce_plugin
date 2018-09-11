@@ -69,10 +69,11 @@ function sc_show_final_text()
     global $woocommerce;
     $g = new WC_SC;
     
+    $arr = explode("_",$_REQUEST['invoice_id']);
+    $order_id  = $arr[0];
+    $order = new WC_Order($order_id);
+        
     if ( $_GET['ppp_status'] == 'FAIL' ){
-        $arr = explode("_",$_REQUEST['invoice_id']);
-        $order_id  = $arr[0];
-        $order = new WC_Order($order_id);
         $order -> add_order_note('User order faild.');
         $order->save();
             
@@ -80,6 +81,12 @@ function sc_show_final_text()
         echo __("Your payment failed. Please, try again.", 'sc');
     }
     elseif ($g->checkAdvancedCheckSum()) {
+        $transactionId = "TransactionId = " . (isset($_GET['TransactionID']) ? $_GET['TransactionID'] : "");
+        $pppTransactionId = "; PPPTransactionId = " . (isset($_GET['PPP_TransactionID']) ? $_GET['PPP_TransactionID'] : "");
+        
+        $order->add_order_note("User returned from Safecharge Payment page; ". $transactionId. $pppTransactionId);
+        $order->save();
+        
         $woocommerce -> cart -> empty_cart();
         echo __("Thank you. Your payment process is completed. Your order status will be updated soon.", 'sc');
     }
