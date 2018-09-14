@@ -15,9 +15,9 @@ if(!defined('ABSPATH'))
     die;
 }
 
-add_action('plugins_loaded', 'woocommerce_g2s_init', 0);
+add_action('plugins_loaded', 'woocommerce_sc_init', 0);
 
-function woocommerce_g2s_init()
+function woocommerce_sc_init()
 {
     if(!class_exists('WC_Payment_Gateway')) {
         return;
@@ -42,26 +42,47 @@ function woocommerce_add_sc_gateway($methods)
 // we come here after DMN redirect
 function sc_enqueue($hook)
 {
-    include_once("token.php");
+    /*  Skip order status update if currentlly received status is 'pending' and curent order status is 'completed'.
+    * For the rest of the cases the status should be updated.   */
+    if(
+        isset($_REQUEST['Status'], $_REQUEST['wc-api'])
+        && $_REQUEST['wc-api'] == 'WC_Gateway_SC'
+        && !empty($_REQUEST['Status'])
+    ) {
+        $arr = explode("_", $_REQUEST['invoice_id']);
+        $order_id  = $arr[0];
+        $order = new WC_Order($order_id);
+        $order_status = strtolower($order->get_status());
+        
+        if (
+            strtolower($_REQUEST['Status']) == 'pending'
+            && $order_status != 'completed'
+        ) {
+            $order->set_status($_REQUEST['Status']);
+        }
+    }
     
-    $timestamp= time();
-    $g = new WC_SC;
-    $g->setEnvironment();
-    
-    $plugin_dir = basename(dirname(__FILE__));
-    
-    wp_register_script("sc_js_script", WP_PLUGIN_URL . '/' . $plugin_dir . '/js/sc.js', array('jquery') );
-    wp_localize_script(
-        'sc_js_script',
-        'myAjax',
-        array(
-            'ajaxurl' => WP_PLUGIN_URL . '/' . $plugin_dir .'/ajax/getAPMs.php',
-            'token' =>generateToken($timestamp),
-            't'=>$timestamp
-        )
-    );  
-    wp_enqueue_script( 'jquery' );
-    wp_enqueue_script( 'sc_js_script' );
+    // Do not use this until implementation of REST api... then the script will be different :)
+//    include_once("token.php");
+//    
+//    $timestamp= time();
+//    $g = new WC_SC;
+//    $g->setEnvironment();
+//    
+//    $plugin_dir = basename(dirname(__FILE__));
+//    
+//    wp_register_script("sc_js_script", WP_PLUGIN_URL . '/' . $plugin_dir . '/js/sc.js', array('jquery') );
+//    wp_localize_script(
+//        'sc_js_script',
+//        'myAjax',
+//        array(
+//            'ajaxurl' => WP_PLUGIN_URL . '/' . $plugin_dir .'/ajax/getAPMs.php',
+//            'token' =>generateToken($timestamp),
+//            't'=>$timestamp
+//        )
+//    );  
+//    wp_enqueue_script( 'jquery' );
+//    wp_enqueue_script( 'sc_js_script' );
 }
 
 function sc_show_final_text()
@@ -73,7 +94,7 @@ function sc_show_final_text()
     $order_id  = $arr[0];
     $order = new WC_Order($order_id);
         
-    if ( $_GET['ppp_status'] == 'FAIL' ){
+    if ( strtolower($_REQUEST['ppp_status']) == 'fail' ) {
         $order -> add_order_note('User order faild.');
         $order->save();
             

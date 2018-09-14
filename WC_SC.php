@@ -18,7 +18,7 @@ class WC_SC extends WC_Payment_Gateway
 		$this -> id = 'sc';
 		$this -> method_title = 'SafeCharge';
 		$this -> method_description = 'Pay with SafeCharge.';
-        $this -> icon = $this -> plugin_url."icons/g2s.png";
+        $this -> icon = $this -> plugin_url."icons/safecharge.png";
 		$this -> has_fields = false;
 
 		$this -> init_form_fields();
@@ -31,7 +31,8 @@ class WC_SC extends WC_Payment_Gateway
         $this -> secret = $this -> settings['secret'];
 		$this -> test = $this -> settings['test'];
 		$this -> URL = $this -> settings['URL'];
-		$this -> load_payment_options = $this -> settings['load_payment_options'];
+		$this -> show_thanks_msg = $this->settings['show_thanks_msg'];
+	//	$this -> load_payment_options = $this -> settings['load_payment_options'];
         
 		$_SESSION['merchant_id'] = $this -> merchant_id;
 		$_SESSION['merchantsite_id'] = $this -> merchantsite_id;
@@ -98,12 +99,18 @@ class WC_SC extends WC_Payment_Gateway
                 'label' => __('Enable test mode', 'sc'),
                 'default' => 'no'
             ),
-            'load_payment_options' => array(
-                'title' => __('Load payment options', 'sc'),
+            'show_thanks_msg' => array(
+                'title' => __('Show "Thank you"', 'sc'),
                 'type' => 'checkbox',
-                'label' => __('All available payment options will be loaded dynamically', 'sc'),
-                'default' => 'yes'
-            )
+                'label' => __('Show "Thank you" message after pay', 'sc'),
+                'default' => 'no'
+            ),
+//            'load_payment_options' => array(
+//                'title' => __('Load payment options', 'sc'),
+//                'type' => 'checkbox',
+//                'label' => __('All available payment options will be loaded dynamically', 'sc'),
+//                'default' => 'yes'
+//            )
         );
     }
 
@@ -126,10 +133,9 @@ class WC_SC extends WC_Payment_Gateway
 		if($this -> description)
             echo wpautop(wptexturize($this -> description));
 		
-        $apms = $this->getAPMS();
-		
-        if ($apms)
-            echo $apms;
+//        $apms = $this->getAPMS();
+//        if ($apms)
+//            echo $apms;
     }
 
     // in paymen page shows SafeCharge sub-option and available payment methods
@@ -180,8 +186,7 @@ class WC_SC extends WC_Payment_Gateway
      **/
     function receipt_page($order_id)
     {
-    //   echo  $this -> generate_sc_form($order_id);
-       $this -> generate_sc_form($order_id);
+       $this->generate_sc_form($order_id);
     }
 
 	 /**
@@ -205,7 +210,6 @@ class WC_SC extends WC_Payment_Gateway
 		
         foreach ( $items as $item ) {
 			$params['item_name_'.$i]        = ($item['name']);
-		//	$params['item_number_'.$i]      = $item["item_meta"]['_product_id'][0];
 			$params['item_number_'.$i]      = $item['product_id'];
 			$params['item_amount_'.$i]      = number_format($item['line_total']/(int)$item['qty'],2,'.', '');
 			$params['item_quantity_'.$i]    = $item['qty'];
@@ -235,16 +239,11 @@ class WC_SC extends WC_Payment_Gateway
 
         $payment_page = SC_Versions_Resolver::get_page_id($order, 'pay');
         
-		if ( get_option( 'woocommerce_force_ssl_checkout' ) == 'yes' )
+		if ( get_option( 'woocommerce_force_ssl_checkout' ) == 'yes' ) {
             $payment_page = str_replace( 'http:', 'https:', $payment_page );
+        }
 		
-        // set different URLs for prod and debug env
-//        if(defined('WP_DEBUG') && WP_DEBUG === true) {
-//            $notify_url = 'http://hostmi.eu/home/resp_listener/';
-//        }
-//        else {
-            $notify_url = add_query_arg(array('wc-api' => 'WC_Gateway_SC'), home_url('/'));
-    //    }
+        $notify_url = add_query_arg(array('wc-api' => 'WC_Gateway_SC'), home_url('/'));
 
         $params['success_url']          = $this->get_return_url();
 		$params['pending_url']          = $this->get_return_url();
@@ -276,8 +275,13 @@ class WC_SC extends WC_Payment_Gateway
         $params['email']                = SC_Versions_Resolver::get_order_data($order, 'billing_email');
         $params['user_token']           = "auto";
         $params['user_token_id']        = SC_Versions_Resolver::get_order_data($order, 'billing_email');
-		$params['payment_method']       = str_replace($this->id.'_','',$_SESSION['sc_subpayment']);
-		$params['merchantLocale']       = $this->formatLocation(get_locale());
+        
+        $params['payment_method']       = '';
+        if(isset($_SESSION['sc_subpayment']) && $_SESSION['sc_subpayment'] != '') {
+            $params['payment_method']   = str_replace($this->id.'_', '', $_SESSION['sc_subpayment']);
+        }
+		
+        $params['merchantLocale']       = $this->formatLocation(get_locale());
 		$params['total_amount']         = SC_Versions_Resolver::get_order_data($order, 'order_total');
         $params['currency']             = get_woocommerce_currency();
         
@@ -297,30 +301,39 @@ class WC_SC extends WC_Payment_Gateway
         
         $this->create_log($params, 'Order params');
         
-        echo
+        $html =
             '<form action="'.$this -> URL.'" method="post" id="sc_payment_form">'
                 .implode('', $params_array)
                 .'<noscript>'
                     .'<input type="submit" class="button-alt" id="submit_sc_payment_form" value="'.__('Pay via SafeCharge', 'sc').'" /><a class="button cancel" href="'.$order->get_cancel_order_url().'">'.__('Cancel order &amp; restore cart', 'sc').'</a>'
                 .'</noscript>'
                 .'<script type="text/javascript">'
-                    .'jQuery(function(){'
-                        .'jQuery("body").block({'
-                            .'message: "<img src=\"'.$this->plugin_url.'/icons/loading.gif\" alt=\"Redirecting!\" style=\"width:100px;float:left; margin-right: 10px;\" />'.__('Thank you for your order. We are now redirecting you to SafeCharge Payment Gateway to make payment.', 'sc').'",'
+                    .'jQuery(function(){';
+    
+        if(isset($this->show_thanks_msg) && $this->show_thanks_msg == 'yes') {
+            $html .=
+                        'jQuery("body").block({'
+                            .'message: \'<img src="'.$this->plugin_url.'icons/loading.gif" alt="Redirecting!" style="width:100px; float:left; margin-right: 10px;" />'.__('Thank you for your order. We are now redirecting you to SafeCharge Payment Gateway to make payment.', 'sc').'\','
                             .'overlayCSS: {background: "#fff", opacity: 0.6},'
                             .'css: {'
-                                .'padding:        20,'
-                                .'textAlign:      "center",'
-                                .'color:          "#555",'
-                                .'border:         "3px solid #aaa",'
-                                .'backgroundColor:"#fff",'
-                                .'cursor:         "wait",'
-                                .'lineHeight:"32px"}'
-                        .'});'
-                        .'jQuery("#sc_payment_form").submit();'
+                                .'padding: 20,'
+                                .'textAlign: "center",'
+                                .'color: "#555",'
+                                .'border: "3px solid #aaa",'
+                                .'backgroundColor: "#fff",'
+                                .'cursor: "wait",'
+                                .'lineHeight: "32px"'
+                            .'}'
+                        .'});';
+        }
+        
+        $html .=
+                        'jQuery("#sc_payment_form").submit();'
                     .'});'
                 .'</script>'
             .'</form>';
+        
+        echo $html;
     }
     
 	 /**
@@ -482,7 +495,8 @@ class WC_SC extends WC_Payment_Gateway
     {
         if (isset($_GET['advanceResponseChecksum'])){
             $str = md5($this->secret.$_GET['totalAmount'].$_GET['currency']
-                .$_GET['responseTimeStamp'].$_GET['PPP_TransactionID'].$_GET['Status'].$_GET['productId']);
+                .$_GET['responseTimeStamp'] . $_GET['PPP_TransactionID']
+                .$_GET['Status'] . $_GET['productId']);
 
             if ($str == $_GET['advanceResponseChecksum'])
                 return true;
@@ -529,7 +543,7 @@ class WC_SC extends WC_Payment_Gateway
         $this->create_log($parameters, 'getAPMS params: ');
         $this->create_log($_SESSION, '$_SESSION: ');
 		
-		if ($this->load_payment_options=='yes'){
+		if ($this->load_payment_options == 'yes') {
 			try{
 				$soap_response = $client->call('getMerchantSitePaymentOptions', $parameters);
 				return $this->showAPMs($soap_response);
