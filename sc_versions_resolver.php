@@ -195,4 +195,14 @@ class SC_Versions_Resolver
             return $client->get_country();
         }
     }
+    
+    public static function get_shipping($order)
+    {
+        if ( version_compare( WOOCOMMERCE_VERSION, '3.0.0', '>' ) ) {
+            return $order->get_shipping_total();
+         }
+         else {
+            return $order->get_total_shipping();
+        }
+    }
 }

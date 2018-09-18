@@ -199,38 +199,53 @@ class WC_SC extends WC_Payment_Gateway
 		$TimeStamp = date('Ymdhis');
         $order = new WC_Order($order_id);
         
+        $this->create_log($order, "the order data: ");
+        
         $order->add_order_note("User is redicted to Safecharge Payment page");
         $order->save();
         
 		$items = $order->get_items();
-		$item_price=0;
-		$i=1;
+	//	$item_price = 0;
+		$i = 1;
 		
         $this->setEnvironment();
 		
         foreach ( $items as $item ) {
+        //   echo '<pre>'.print_r($item, true).'</pre>';
 			$params['item_name_'.$i]        = ($item['name']);
 			$params['item_number_'.$i]      = $item['product_id'];
-			$params['item_amount_'.$i]      = number_format($item['line_total']/(int)$item['qty'],2,'.', '');
-			$params['item_quantity_'.$i]    = $item['qty'];
+            $params['item_quantity_'.$i]    = $item['qty'];
+            
+            // $item['line_total']  = price - discount
+        //    $amount                         = number_format($item['line_total'] / (int) $item['qty'], 2, '.', '');
+            // this is the real price
+            $item_price                     = number_format($item['line_subtotal'] / (int) $item['qty'], 2, '.', '');
+			$params['item_amount_'.$i]      = $item_price;
 			
-            $item_price += number_format(($item['line_total']),2,'.', '');
+            // Use this ONLY when the merchant is not using open amount and when there is an items table on their theme.
+            //$params['item_discount_'.$i]    = number_format(($item_price - $amount), 2, '.', '');
+            
             $i++;
 		}
         
         $params['numberofitems'] = $i-1;
         
-		$item_price_total = number_format($item_price,2,'.', '');
-		
-        $params['handling'] = number_format(
-            (SC_Versions_Resolver::get_order_data($order, 'order_total') - $item_price_total),
-            2, '.', ''
-        );
-		
+        $params['handling'] = SC_Versions_Resolver::get_shipping($order);
+        $params['discount'] = number_format($order->get_discount_total(), 2, '.', '');
+        
 		if ($params['handling'] < 0) {
-			$params['discount'] = abs($params['handling']); 
+			$params['discount'] += abs($params['handling']); 
 		}
-		
+        
+        // we are not sure can woocommerce support more than one tax.
+        // if it can, may be sum them is not the correct aproch, this must be tested
+        $total_tax_prec = 0;
+        $taxes = WC_Tax::get_rates();
+        foreach($taxes as $data) {
+            $total_tax_prec += $data['rate'];
+        }
+        
+        $params['total_tax'] = number_format($total_tax_prec, 2, '.', '');
 		$params['merchant_id'] = $this -> merchant_id;
 		$params['merchant_site_id'] = $this -> merchantsite_id;
 		$params['time_stamp'] = $TimeStamp;
@@ -282,10 +297,28 @@ class WC_SC extends WC_Payment_Gateway
         }
 		
         $params['merchantLocale']       = $this->formatLocation(get_locale());
-		$params['total_amount']         = SC_Versions_Resolver::get_order_data($order, 'order_total');
+        $params['total_amount']         = SC_Versions_Resolver::get_order_data($order, 'order_total');
         $params['currency']             = get_woocommerce_currency();
         
 		$for_hash = '';
+        
+        // this is the sum of items prices - 10.01
+//        echo 'sum prices: <pre>'.print_r($order->get_subtotal(),true).'</pre>';
+//        
+//        echo 'get_tax_totals: <pre>'.print_r($order->get_tax_totals(),true).'</pre>';
+//        echo 'get_total_tax: <pre>'.print_r($order->get_total_tax(),true).'</pre>';
+//        echo 'get_total_tax: <pre>'.print_r(WC_Tax::get_rates(),true).'</pre>';
+//        
+//        
+//        // final discount
+//        echo 'total discount: <pre>'.print_r($params['discount'], true).'</pre>';
+//        echo 'handling: <pre>'.print_r($params['handling'], true).'</pre>';
+//        // get_subtotal - discount + handling
+//        echo 'total_amount: <pre>'.print_r($params['total_amount'],true).'</pre>';
+//        
+//        echo 'params: <pre>'.print_r($params,true).'</pre>';
+        
+        //die;
         
 		foreach($params as $k=>$v){
 			$for_hash .= $v;
@@ -375,7 +408,7 @@ class WC_SC extends WC_Payment_Gateway
 				$verified = false;
 				// md5sig validation
 				if ($this->secret) {
-					$hash  =  $this->secret.$_REQUEST['ppp_status'].$_REQUEST['PPP_TransactionID'];
+					$hash  =  $this->secret.$_REQUEST['ppp_status'] . $_REQUEST['PPP_TransactionID'];
 					$md5hash = md5($hash);
 					$md5sig = $_REQUEST['responsechecksum'];
 					if ($md5hash == $md5sig) {
