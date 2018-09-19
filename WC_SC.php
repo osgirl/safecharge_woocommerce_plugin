@@ -100,9 +100,9 @@ class WC_SC extends WC_Payment_Gateway
                 'default' => 'no'
             ),
             'show_thanks_msg' => array(
-                'title' => __('Show "Thank you"', 'sc'),
+                'title' => __('Show "Loading message"', 'sc'),
                 'type' => 'checkbox',
-                'label' => __('Show "Thank you" message after pay', 'sc'),
+                'label' => __('Show "Loading message" when redirect to secure cashier', 'sc'),
                 'default' => 'no'
             ),
 //            'load_payment_options' => array(

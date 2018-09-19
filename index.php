@@ -8,8 +8,7 @@ Author: SafeCharge
 Author URI:http://safecharge.com
 */
 
-if(!defined('ABSPATH'))
-{
+if(!defined('ABSPATH')) {
     $die = file_get_contents(dirname( __FILE__ ) . DIRECTORY_SEPARATOR . 'die.html');
     echo $die;
     die;
