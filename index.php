@@ -27,6 +27,7 @@ function woocommerce_sc_init()
     add_filter('woocommerce_payment_gateways', 'woocommerce_add_sc_gateway' );
 	add_action( 'init', 'sc_enqueue' );
 	add_action( 'woocommerce_thankyou_order_received_text', 'sc_show_final_text' );
+    add_action('woocommerce_create_refund', 'sc_create_refund');
 }
 
 /**
@@ -110,4 +111,12 @@ function sc_show_final_text()
         $woocommerce -> cart -> empty_cart();
         echo __("Thank you. Your payment process is completed. Your order status will be updated soon.", 'sc');
     }
+}
+
+function sc_create_refund()
+{
+    require_once 'WC_SC_Refund.php';
+    
+    $refund = new WC_SC_Refund();
+    $refund->sc_refund_order();
 }

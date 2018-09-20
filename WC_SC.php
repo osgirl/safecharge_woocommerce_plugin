@@ -42,10 +42,6 @@ class WC_SC extends WC_Payment_Gateway
 		$this -> liveWSDL = 'https://secure.xtpayments.com/PaymentOptionInfoService?wsdl';
 		$this -> testWSDL = 'https://ppp-test.safecharge.com/PaymentOptionInfoService?wsdl';
         
-        // the Refund is available ONLY with the REST API
-        $this->live_refund_url = 'https://secure.safecharge.com/ppp/api/v1/refundTransaction.do';
-        $this->test_refund_url = 'https://ppp-test.safecharge.com/ppp/api/v1/refundTransaction.do';
-		
 		$this -> msg['message'] = "";
 		$this -> msg['class'] = "";
 
@@ -53,9 +49,6 @@ class WC_SC extends WC_Payment_Gateway
 		add_action('woocommerce_checkout_process', array($this, 'sc_checkout_process'));
 		add_action('woocommerce_receipt_'.$this -> id, array($this, 'receipt_page'));
 		add_action('woocommerce_api_wc_gateway_sc', array($this, 'process_sc_notification'));
-        
-        add_action('woocommerce_order_refunded', array($this, 'woocommerce_order_refunded'));
-        add_action('woocommerce_refund_created', array($this, 'woocommerce_refund_created'));
 	}
 
 	function init_form_fields()
@@ -364,31 +357,24 @@ class WC_SC extends WC_Payment_Gateway
         $params['total_amount']     = SC_Versions_Resolver::get_order_data($order, 'order_total');
         $params['currency']         = get_woocommerce_currency();
         
-		$for_hash = '';
-        
-        // this is the sum of items prices - 10.01
 //        echo 'sum prices: <pre>'.print_r($order->get_subtotal(),true).'</pre>';
-//        
 //        echo 'get_tax_totals: <pre>'.print_r($order->get_tax_totals(),true).'</pre>';
 //        echo 'get_total_tax: <pre>'.print_r($order->get_total_tax(),true).'</pre>';
 //        echo 'get_total_tax: <pre>'.print_r(WC_Tax::get_rates(),true).'</pre>';
 //        
-//        
-//        // final discount
 //        echo 'total discount: <pre>'.print_r($params['discount'], true).'</pre>';
 //        echo 'handling: <pre>'.print_r($params['handling'], true).'</pre>';
-//        // get_subtotal - discount + handling
 //        echo 'total_amount: <pre>'.print_r($params['total_amount'],true).'</pre>';
-//        
-        echo 'params: <pre>'.print_r($params,true).'</pre>';
+//        echo 'params: <pre>'.print_r($params,true).'</pre>';
         
-        die;
+        //die;
         
+        $for_hash = '';
 		foreach($params as $k=>$v){
 			$for_hash .= $v;
 		}
         
-        $params['checksum']             = md5( stripslashes($this->secret.$for_hash));
+        $params['checksum'] = md5( stripslashes($this->secret . $for_hash));
 
         $params_array = array();
         
@@ -615,16 +601,6 @@ class WC_SC extends WC_Payment_Gateway
             $this->use_refund_url = $this->live_refund_url;
 		}
 	}
-    
-    public function woocommerce_order_refunded()
-    {
-        die('function woocommerce_order_refunded');
-    }
-    
-    public function woocommerce_refund_created()
-    {
-        die('function woocommerce_refund_created');
-    }
     
     private function getAPMS()
     {
