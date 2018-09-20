@@ -41,6 +41,10 @@ class WC_SC extends WC_Payment_Gateway
 		$this -> testurl = 'https://ppp-test.safecharge.com/ppp/purchase.do';
 		$this -> liveWSDL = 'https://secure.xtpayments.com/PaymentOptionInfoService?wsdl';
 		$this -> testWSDL = 'https://ppp-test.safecharge.com/PaymentOptionInfoService?wsdl';
+        
+        // the Refund is available ONLY with the REST API
+        $this->live_refund_url = 'https://secure.safecharge.com/ppp/api/v1/refundTransaction.do';
+        $this->test_refund_url = 'https://ppp-test.safecharge.com/ppp/api/v1/refundTransaction.do';
 		
 		$this -> msg['message'] = "";
 		$this -> msg['class'] = "";
@@ -49,6 +53,9 @@ class WC_SC extends WC_Payment_Gateway
 		add_action('woocommerce_checkout_process', array($this, 'sc_checkout_process'));
 		add_action('woocommerce_receipt_'.$this -> id, array($this, 'receipt_page'));
 		add_action('woocommerce_api_wc_gateway_sc', array($this, 'process_sc_notification'));
+        
+        add_action('woocommerce_order_refunded', array($this, 'woocommerce_order_refunded'));
+        add_action('woocommerce_refund_created', array($this, 'woocommerce_refund_created'));
 	}
 
 	function init_form_fields()
@@ -205,10 +212,11 @@ class WC_SC extends WC_Payment_Gateway
         $order->save();
         
 		$items = $order->get_items();
-	//	$item_price = 0;
 		$i = 1;
 		
         $this->setEnvironment();
+        
+        $params['site_url'] = get_site_url();
 		
         foreach ( $items as $item ) {
         //   echo '<pre>'.print_r($item, true).'</pre>';
@@ -221,6 +229,21 @@ class WC_SC extends WC_Payment_Gateway
             // this is the real price
             $item_price                     = number_format($item['line_subtotal'] / (int) $item['qty'], 2, '.', '');
 			$params['item_amount_'.$i]      = $item_price;
+            
+            // set product img url
+            $params['item_image_'.$i] = '';
+            $prod_img_data = wp_get_attachment_image_src(get_post_thumbnail_id($item['product_id']));
+            if(
+                $prod_img_data
+                && is_array($prod_img_data)
+                && !empty($prod_img_data)
+                && isset($prod_img_data[0])
+                && $prod_img_data[0] != ''
+            ) {
+                $prod_img_path = str_replace($params['site_url'], '', $prod_img_data[0]);
+            }
+            $params['item_image_'.$i] = $prod_img_path;
+            // set product img url END
 			
             // Use this ONLY when the merchant is not using open amount and when there is an items table on their theme.
             //$params['item_discount_'.$i]    = number_format(($item_price - $amount), 2, '.', '');
@@ -268,6 +291,7 @@ class WC_SC extends WC_Payment_Gateway
 		$params['invoice_id']           = $order_id.'_'.$TimeStamp;
 		$params['merchant_unique_id']   = $order_id.'_'.$TimeStamp;
         
+        // get and pass to cashier billing data
 		$params['first_name'] =
             urlencode(preg_replace("/[[:punct:]]/", '', SC_Versions_Resolver::get_order_data($order, 'billing_first_name')));
 		$params['last_name'] =
@@ -288,17 +312,57 @@ class WC_SC extends WC_Payment_Gateway
             urlencode(preg_replace("/[[:punct:]]/", '', SC_Versions_Resolver::get_order_data($order, 'billing_phone')));
 		
         $params['email']                = SC_Versions_Resolver::get_order_data($order, 'billing_email');
-        $params['user_token']           = "auto";
         $params['user_token_id']        = SC_Versions_Resolver::get_order_data($order, 'billing_email');
+        // get and pass to cashier billing data END
         
-        $params['payment_method']       = '';
+        // get and pass to cashier hipping data
+        $sh_f_name = urlencode(preg_replace("/[[:punct:]]/", '', SC_Versions_Resolver::get_order_data($order, 'shipping_first_name')));
+        if(empty(trim($sh_f_name))) {
+            $sh_f_name = $params['first_name'];
+        }
+        $params['shippingFirstName'] = $sh_f_name;
+        
+        $sh_l_name = urlencode(preg_replace("/[[:punct:]]/", '', SC_Versions_Resolver::get_order_data($order, 'shipping_last_name')));
+        if(empty(trim($sh_l_name))) {
+            $sh_l_name = $params['last_name'];
+        }
+        $params['shippingLastName'] = $sh_l_name;
+        
+        $sh_addr = urlencode(preg_replace("/[[:punct:]]/", '', SC_Versions_Resolver::get_order_data($order, 'shipping_address_1')));
+        if(empty(trim($sh_addr))) {
+            $sh_addr = $params['address1'];
+        }
+        $params['shippingAddress'] = $sh_addr;
+        
+        $sh_city = urlencode(preg_replace("/[[:punct:]]/", '', SC_Versions_Resolver::get_order_data($order, 'shipping_city')));
+        if(empty(trim($sh_city))) {
+            $sh_city = $params['city'];
+        }
+        $params['shippingCity'] = $sh_city;
+        
+        $sh_country = urlencode(preg_replace("/[[:punct:]]/", '', SC_Versions_Resolver::get_order_data($order, 'shipping_country')));
+        if(empty(trim($sh_country))) {
+            $sh_city = $params['country'];
+        }
+        $params['shippingCountry'] = $sh_country;
+        
+        $sh_zip = urlencode(preg_replace("/[[:punct:]]/", '', SC_Versions_Resolver::get_order_data($order, 'shipping_postcode')));
+        if(empty(trim($sh_zip))) {
+            $sh_zip = $params['zip'];
+        }
+        $params['shippingZip'] = $sh_zip;
+        // get and pass to cashier hipping data END
+        
+        $params['user_token'] = "auto";
+        
+        $params['payment_method'] = '';
         if(isset($_SESSION['sc_subpayment']) && $_SESSION['sc_subpayment'] != '') {
-            $params['payment_method']   = str_replace($this->id.'_', '', $_SESSION['sc_subpayment']);
+            $params['payment_method'] = str_replace($this->id.'_', '', $_SESSION['sc_subpayment']);
         }
 		
-        $params['merchantLocale']       = $this->formatLocation(get_locale());
-        $params['total_amount']         = SC_Versions_Resolver::get_order_data($order, 'order_total');
-        $params['currency']             = get_woocommerce_currency();
+        $params['merchantLocale']   = $this->formatLocation(get_locale());
+        $params['total_amount']     = SC_Versions_Resolver::get_order_data($order, 'order_total');
+        $params['currency']         = get_woocommerce_currency();
         
 		$for_hash = '';
         
@@ -316,9 +380,9 @@ class WC_SC extends WC_Payment_Gateway
 //        // get_subtotal - discount + handling
 //        echo 'total_amount: <pre>'.print_r($params['total_amount'],true).'</pre>';
 //        
-//        echo 'params: <pre>'.print_r($params,true).'</pre>';
+        echo 'params: <pre>'.print_r($params,true).'</pre>';
         
-        //die;
+        die;
         
 		foreach($params as $k=>$v){
 			$for_hash .= $v;
@@ -543,12 +607,24 @@ class WC_SC extends WC_Payment_Gateway
     function setEnvironment()
     {
 		if ($this->test == 'yes'){
-			$this->useWSDL =  $this->testWSDL;
+			$this->useWSDL = $this->testWSDL;
+            $this->use_refund_url = $this->test_refund_url;
 		}
         else {
-			$this->useWSDL =  $this->liveWSDL;
+			$this->useWSDL = $this->liveWSDL;
+            $this->use_refund_url = $this->live_refund_url;
 		}
 	}
+    
+    public function woocommerce_order_refunded()
+    {
+        die('function woocommerce_order_refunded');
+    }
+    
+    public function woocommerce_refund_created()
+    {
+        die('function woocommerce_refund_created');
+    }
     
     private function getAPMS()
     {
