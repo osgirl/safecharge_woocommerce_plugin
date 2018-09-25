@@ -16,8 +16,8 @@ class WC_SC extends WC_Payment_Gateway
         
         # settings to get/save options
 		$this -> id = 'sc';
-		$this -> method_title = 'SafeCharge';
-		$this -> method_description = 'Pay with SafeCharge.';
+		$this -> method_title = SC_GATEWAY_TITLE;
+		$this -> method_description = 'Pay with '. SC_GATEWAY_TITLE .'.';
         $this -> icon = $this -> plugin_url."icons/safecharge.png";
 		$this -> has_fields = false;
 
@@ -57,35 +57,36 @@ class WC_SC extends WC_Payment_Gateway
             'enabled' => array(
                 'title' => __('Enable/Disable', 'sc'),
                 'type' => 'checkbox',
-                'label' => __('Enable SafeCharge Payment Module.', 'sc'),
+                'label' => __('Enable '. SC_GATEWAY_TITLE .' Payment Module.', 'sc'),
                 'default' => 'no'
             ),
            'title' => array(
                 'title' => __('Title:', 'sc'),
                 'type'=> 'text',
                 'description' => __('This controls the title which the user sees during checkout.', 'sc'),
-                'default' => __('SafeCharge', 'sc')
+                'default' => __(SC_GATEWAY_TITLE, 'sc')
             ),
             'description' => array(
                 'title' => __('Description:', 'sc'),
                 'type' => 'textarea',
                 'description' => __('This controls the description which the user sees during checkout.', 'sc'),
-                'default' => __('Pay securely by Credit or Debit card or local payment option through SafeCharge secured payment page.', 'sc')
+                'default' => __('Pay securely by Credit or Debit card or local payment option through '
+                    .SC_GATEWAY_TITLE .' secured payment page.', 'sc')
             ),
             'merchant_id' => array(
                 'title' => __('Merchant ID', 'sc'),
                 'type' => 'text',
-                'description' => __('Merchant ID is provided by SafeCharge.')
+                'description' => __('Merchant ID is provided by '. SC_GATEWAY_TITLE .'.')
             ),
             'merchantsite_id' => array(
                 'title' => __('Merchant Site ID', 'sc'),
                 'type' => 'text',
-                'description' => __('Merchant Site ID is provided by SafeCharge.')
+                'description' => __('Merchant Site ID is provided by '. SC_GATEWAY_TITLE .'.')
             ),
             'secret' => array(
                 'title' => __('Secret key', 'sc'),
                 'type' => 'text',
-                'description' =>  __('Secret key is provided by SafeCharge', 'sc'),
+                'description' =>  __('Secret key is provided by '. SC_GATEWAY_TITLE, 'sc'),
             ),
             'URL' => array(
                 'title' => __('Payment URL', 'sc'),
@@ -118,7 +119,7 @@ class WC_SC extends WC_Payment_Gateway
     {
         // Generate the HTML For the settings form.
         echo
-            '<h3>'.__('SafeCharge ', 'g2s').'</h3>'
+            '<h3>'.__(SC_GATEWAY_TITLE .' ', 'sc').'</h3>'
             .'<p>'.__('SC payment option').'</p>'
             .'<table class="form-table">';
                 $this -> generate_settings_html();
@@ -274,13 +275,11 @@ class WC_SC extends WC_Payment_Gateway
             $payment_page = str_replace( 'http:', 'https:', $payment_page );
         }
 		
-        $notify_url = add_query_arg(array('wc-api' => 'WC_Gateway_SC'), home_url('/'));
-
         $params['success_url']          = $this->get_return_url();
 		$params['pending_url']          = $this->get_return_url();
 		$params['error_url']            = $this->get_return_url();
 		$params['back_url']             = $payment_page;
-		$params['notify_url']           = $notify_url;
+		$params['notify_url']           = SC_NOTIFY_URL;
 		$params['invoice_id']           = $order_id.'_'.$TimeStamp;
 		$params['merchant_unique_id']   = $order_id.'_'.$TimeStamp;
         
@@ -388,7 +387,7 @@ class WC_SC extends WC_Payment_Gateway
             '<form action="'.$this -> URL.'" method="post" id="sc_payment_form">'
                 .implode('', $params_array)
                 .'<noscript>'
-                    .'<input type="submit" class="button-alt" id="submit_sc_payment_form" value="'.__('Pay via SafeCharge', 'sc').'" /><a class="button cancel" href="'.$order->get_cancel_order_url().'">'.__('Cancel order &amp; restore cart', 'sc').'</a>'
+                    .'<input type="submit" class="button-alt" id="submit_sc_payment_form" value="'.__('Pay via '. SC_GATEWAY_TITLE, 'sc').'" /><a class="button cancel" href="'.$order->get_cancel_order_url().'">'.__('Cancel order &amp; restore cart', 'sc').'</a>'
                 .'</noscript>'
                 .'<script type="text/javascript">'
                     .'jQuery(function(){';
@@ -396,7 +395,7 @@ class WC_SC extends WC_Payment_Gateway
         if(isset($this->show_thanks_msg) && $this->show_thanks_msg == 'yes') {
             $html .=
                         'jQuery("body").block({'
-                            .'message: \'<img src="'.$this->plugin_url.'icons/loading.gif" alt="Redirecting!" style="width:100px; float:left; margin-right: 10px;" />'.__('Thank you for your order. We are now redirecting you to SafeCharge Payment Gateway to make payment.', 'sc').'\','
+                            .'message: \'<img src="'.$this->plugin_url.'icons/loading.gif" alt="Redirecting!" style="width:100px; float:left; margin-right: 10px;" />'.__('Thank you for your order. We are now redirecting you to '. SC_GATEWAY_TITLE .' Payment Gateway to make payment.', 'sc').'\','
                             .'overlayCSS: {background: "#fff", opacity: 0.6},'
                             .'css: {'
                                 .'padding: 20,'
@@ -488,13 +487,13 @@ class WC_SC extends WC_Payment_Gateway
 					break;
 
 					case 'APPROVED':
-						$message ='The amount has been authorized and captured by SafeCharge. PPP_TransactionID = '.$_REQUEST['PPP_TransactionID'].", Status = ".$status.", TransactionType = ".$transactionType.', GW_TransactionID = '.$_REQUEST['TransactionID'];
+						$message ='The amount has been authorized and captured by '. SC_GATEWAY_TITLE .'. PPP_TransactionID = '.$_REQUEST['PPP_TransactionID'].", Status = ".$status.", TransactionType = ".$transactionType.', GW_TransactionID = '.$_REQUEST['TransactionID'];
 						$this -> msg['message'] = $message;
                         $this -> msg['class'] = 'woocommerce_message';
 						$order -> payment_complete($order_id);
 						
 						$order->update_status( 'completed' );
-						$order -> add_order_note('SafeCharge payment is successful<br/>Unique Id: '.$_REQUEST['PPP_TransactionID']);
+						$order -> add_order_note(SC_GATEWAY_TITLE .' payment is successful<br/>Unique Id: '.$_REQUEST['PPP_TransactionID']);
 						$order -> add_order_note($this->msg['message']);
 						$woocommerce -> cart -> empty_cart();
 					break;
@@ -517,7 +516,7 @@ class WC_SC extends WC_Payment_Gateway
                             $message ='Payment is still pending '.$_REQUEST['PPP_TransactionID'].", Status = ".$status.", TransactionType = ".$transactionType.', GW_TransactionID = '.$_REQUEST['TransactionID'];
                             $this -> msg['message'] = $message;
                             $this -> msg['class'] = 'woocommerce_message woocommerce_message_info';
-                            $order -> add_order_note('SafeCharge payment status is pending<br/>Unique Id: '.$_REQUEST['PPP_TransactionID']);
+                            $order -> add_order_note(SC_GATEWAY_TITLE .' payment status is pending<br/>Unique Id: '.$_REQUEST['PPP_TransactionID']);
                             $order -> add_order_note($this->msg['message']);
                             $order -> update_status('on-hold');
                             $woocommerce -> cart -> empty_cart();
