@@ -102,7 +102,8 @@ class WC_SC_Refund extends WC_Order_Refund
             $order -> add_order_note(__($note, 'sc'));
             $order->save();
             
-            wp_send_json_error( array( 'error' => $note ) );
+            wp_send_json_success();
+        //    wp_send_json_error( array( 'error' => $note ) );
         }
         
         $json_arr = json_decode($resp, true);
@@ -115,7 +116,8 @@ class WC_SC_Refund extends WC_Order_Refund
             $order -> add_order_note(__($note, 'sc'));
             $order->save();
             
-            wp_send_json_error( array( 'error' => $note ) );
+            wp_send_json_success();
+        //    wp_send_json_error( array( 'error' => $note ) );
         }
         
         $this->create_log($json_arr, '$json_arr: ');
@@ -126,7 +128,8 @@ class WC_SC_Refund extends WC_Order_Refund
             $order -> add_order_note(__($note, 'sc'));
             $order->save();
             
-            wp_send_json_error( array( 'error' => $note ) );
+            wp_send_json_success();
+        //    wp_send_json_error( array( 'error' => $note ) );
         }
         
         // check the transaction status
@@ -144,7 +147,8 @@ class WC_SC_Refund extends WC_Order_Refund
             $order -> add_order_note(__($note.'. '.$error_note, 'sc'));
             $order->save();
             
-            wp_send_json_error( array('error' => $note));
+            wp_send_json_success();
+        //    wp_send_json_error( array('error' => $note));
         }
         
         // create refund note
@@ -152,7 +156,7 @@ class WC_SC_Refund extends WC_Order_Refund
         $order -> add_order_note(__($note, 'sc'));
         $order->save();
         
-        wp_send_json_success($note);
+        wp_send_json_success();
     }
     
     /**
