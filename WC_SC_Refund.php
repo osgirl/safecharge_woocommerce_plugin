@@ -12,8 +12,14 @@ class WC_SC_Refund extends WC_Order_Refund
     // the Refund is available ONLY with the REST API
     private $live_refund_url = 'https://secure.safecharge.com/ppp/api/v1/refundTransaction.do';
     private $test_refund_url = 'https://ppp-test.safecharge.com/ppp/api/v1/refundTransaction.do';
+    
+    // the two options for user CPanel
+    private $user_test_cpanel_url = 'sandbox.safecharge.com';
+    private $user_live_cpanel_url = 'cpanel.safecharge.com';
+    
     private $settings = array();
     private $use_refund_url = '';
+    private $use_cpanel_url = '';
     
     public function __construct()
     {
@@ -22,19 +28,16 @@ class WC_SC_Refund extends WC_Order_Refund
         $this->settings = $gateway->settings;
         
         $this->use_refund_url = $this->test_refund_url;
+        $this->use_cpanel_url = $this->user_test_cpanel_url;
+        
         if($this->settings['test'] == 'no') {
             $this->use_refund_url = $this->live_refund_url;
+            $this->use_cpanel_url = $this->user_live_cpanel_url;
         }
     }
     
     public function sc_refund_order()
     {
-        check_ajax_referer( 'order-item', 'security' );
-
-        if ( ! current_user_can( 'edit_shop_orders' ) ) {
-            wp_die( -1 );
-        }
-        
         $request = $_REQUEST;
         $order = new WC_Order((int)$_REQUEST['order_id'] );
         $refunds = $order->get_refunds();
@@ -47,37 +50,41 @@ class WC_SC_Refund extends WC_Order_Refund
             'merchantSiteId'        => $this->settings['merchantsite_id'],
             'clientRequestId'       => $time . '_' . $ord_tr_id,
             'clientUniqueId'        => $ord_tr_id,
-        //    'amount'                => $request['refund_amount'],
-            'amount'                => (string) $refunds[0]->data['amount'],
+            'amount'                => number_format($refunds[0]->data['amount'], 2),
             'currency'              => get_woocommerce_currency(),
             'relatedTransactionId'  => $order->get_meta(SC_GW_TRANS_ID_KEY), // GW Transaction ID
             'authCode'              => $order->get_meta(SC_AUTH_CODE_KEY),
-        //    'comment'               => $request['refund_reason'], // optional
             'comment'               => $refunds[0]->data['reason'], // optional
             'urlDetails'            => array('notificationUrl' => SC_NOTIFY_URL),
             'timeStamp'             => $time,
         );
         
         $checksum_str = '';
-        foreach($ref_parameters as $val) {
-            $checksum_str .= $val;
+        foreach($ref_parameters as $key => $val) {
+            if($key == 'urlDetails') {
+                $checksum_str .= $ref_parameters['urlDetails']['notificationUrl'];
+            }
+            else {
+                $checksum_str .= $val;
+            }
         }
         $checksum_str .= $this->settings['secret'];
         
-        $ref_parameters['checksum'] = hash('md5', $checksum_str);
-        $json_array = json_encode($ref_parameters);
+        $ref_parameters['checksum'] = hash($this->settings['hash_type'], $checksum_str);
+        $json_post = json_encode($ref_parameters);
+        
+        $this->create_log($ref_parameters, '$ref_parameters: ');
+        $this->create_log($json_post, '$json_post: ');
         
         // create cURL post
         $ch = curl_init();
         
         curl_setopt($ch, CURLOPT_URL, $this->use_refund_url);
-        curl_setopt($ch, CURLOPT_POST, 1);
-        
-        curl_setopt($ch, CURLOPT_POSTFIELDS, $json_array);
-        curl_setopt($ch, CURLOPT_POSTFIELDS, array(
-            'Content-Type:application/json', 'Content-Length: ' . strlen($json_array))
+        curl_setopt($ch, CURLOPT_CUSTOMREQUEST, "POST");
+        curl_setopt($ch, CURLOPT_POSTFIELDS, $json_post);
+        curl_setopt($ch, CURLOPT_HTTPHEADER, array(
+            'Content-Type:application/json', 'Content-Length: ' . strlen($json_post))
         );
-        
         curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
         curl_setopt($ch, CURLOPT_SSL_VERIFYPEER, false);
         curl_setopt($ch, CURLOPT_SSL_VERIFYHOST, false);
@@ -85,36 +92,67 @@ class WC_SC_Refund extends WC_Order_Refund
         $resp = curl_exec($ch);
         curl_close ($ch);
         
+        $note = '';
+        $error_note = 'Please check your e-mail for details and manually delete request Refund #'
+            .$refunds[0]->id.' form the order or login into '. $this->use_cpanel_url
+            .' and refund Transaction ID '.$order->get_meta(SC_GW_TRANS_ID_KEY);
+        
         if($resp === false){
-            wp_send_json_error( array( 'error' => __('The REST API retun false.', 'sc') ) );
-            exit;
+            $note = __('The REST API retun false. '.$error_note, 'sc');
+            $order -> add_order_note(__($note, 'sc'));
+            $order->save();
+            
+            wp_send_json_error( array( 'error' => $note ) );
         }
         
-        $resp_str = file_get_contents("php://input");
-        $json_arr = null;
-        
-        $json_arr = json_decode($resp_str, true);
+        $json_arr = json_decode($resp, true);
         if(!is_array($json_arr)) {
-            parse_str($resp_str, $json_arr);
+            parse_str($resp, $json_arr);
         }
-        
+
         if(!is_array($json_arr)) {
-            wp_send_json_error( array( 'error' => __('Invalid API response', 'sc') ) );
-            exit;
+            $note =  __('Invalid API response. '.$error_note, 'sc');
+            $order -> add_order_note(__($note, 'sc'));
+            $order->save();
+            
+            wp_send_json_error( array( 'error' => $note ) );
         }
         
-        $order_refund_text = 'Your request - Refund #' . $refunds[0]->id . ', was ';
-        if($json_arr['api_refund'] == 'false') {
-            $order_refund_text .= 'not ';
-        }
-        $order_refund_text .= 'successful. Please check your e-mail for more information.';
+        $this->create_log($json_arr, '$json_arr: ');
         
-        $order -> add_order_note(__($order_refund_text, 'sc'));
+        // the status of the request
+        if(isset($json_arr['status']) && $json_arr['status'] == 'ERROR') {
+            $note = __('Error, Invalid checksum. '.$error_note, 'sc');
+            $order -> add_order_note(__($note, 'sc'));
+            $order->save();
+            
+            wp_send_json_error( array( 'error' => $note ) );
+        }
+        
+        // check the transaction status
+        if(isset($json_arr['transactionStatus']) && $json_arr['transactionStatus'] == 'ERROR') {
+            if(isset($json_arr['gwErrorReason']) && !empty($json_arr['gwErrorReason'])) {
+                $note = $json_arr['gwErrorReason'];
+            }
+            elseif(isset($json_arr['paymentMethodErrorReason']) && !empty($json_arr['paymentMethodErrorReason'])) {
+                $note = $json_arr['paymentMethodErrorReason'];
+            }
+            else {
+                $note = 'Transaction error';
+            }
+            
+            $order -> add_order_note(__($note.'. '.$error_note, 'sc'));
+            $order->save();
+            
+            wp_send_json_error( array('error' => $note));
+        }
+        
+        // create refund note
+        $note = 'Your request - Refund #' . $refunds[0]->id . ', was successful. Please check your e-mail for details!';
+        $order -> add_order_note(__($note, 'sc'));
         $order->save();
         
-        $this->create_log($ref_parameters, '$ref_parameters: ');
-        $this->create_log($response, '$response: ');
-    //    wp_send_json_success( array('status' => true) );
+        wp_send_json_success($note);
     }
     
     /**

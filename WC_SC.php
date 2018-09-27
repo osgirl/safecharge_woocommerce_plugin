@@ -32,6 +32,9 @@ class WC_SC extends WC_Payment_Gateway
 		$this -> test = $this -> settings['test'];
 		$this -> URL = $this -> settings['URL'];
 		$this -> show_thanks_msg = $this->settings['show_thanks_msg'];
+		$this -> show_thanks_msg = $this->settings['show_thanks_msg'];
+		$this -> hash_type = isset($this->settings['hash_type'])
+            ? $this->settings['hash_type'] : 'md5';
 	//	$this -> load_payment_options = $this -> settings['load_payment_options'];
         
 		$_SESSION['merchant_id'] = $this -> merchant_id;
@@ -93,6 +96,15 @@ class WC_SC extends WC_Payment_Gateway
                 'type' => 'text',
                 'description' =>  __('Url to the payment gateway', 'sc'),
                 'default' => 'https://secure.safecharge.com/ppp/purchase.do'
+            ),
+            'hash_type' => array(
+                'title' => __('Hash type', 'sc'),
+                'type' => 'select',
+                'label' => __('Choose Hash type provided by '. SC_GATEWAY_TITLE, 'sc'),
+                'options' => array(
+                    'md5' => 'md5',
+                    'sha256' => 'sha256',
+                )
             ),
             'test' => array(
                 'title' => __('Test mode', 'sc'),
@@ -225,7 +237,7 @@ class WC_SC extends WC_Payment_Gateway
 			$params['item_amount_'.$i]      = $item_price;
             
             // set product img url
-            $params['item_image_'.$i] = '';
+            $prod_img_path = '';
             $prod_img_data = wp_get_attachment_image_src(get_post_thumbnail_id($item['product_id']));
             if(
                 $prod_img_data
@@ -593,11 +605,9 @@ class WC_SC extends WC_Payment_Gateway
     {
 		if ($this->test == 'yes'){
 			$this->useWSDL = $this->testWSDL;
-            $this->use_refund_url = $this->test_refund_url;
 		}
         else {
 			$this->useWSDL = $this->liveWSDL;
-            $this->use_refund_url = $this->live_refund_url;
 		}
 	}
     

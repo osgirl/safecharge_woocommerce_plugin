@@ -94,9 +94,9 @@ function sc_enqueue($hook)
 {
     // add to the log the REQUEST_URIs to view REST API response
     // TODO remove this when get what you need!
-    if(!empty($_SERVER['REQUEST_URI'])) {
-    //    create_log($_SERVER['REQUEST_URI'], 'Requested URL: ');
-    }
+//    if(!empty($_SERVER['REQUEST_URI'])) {
+//        create_log($_SERVER['REQUEST_URI'], 'Requested URL: ');
+//    }
     
     // when we get DMN from Cashier
     if(
