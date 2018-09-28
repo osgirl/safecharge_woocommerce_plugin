@@ -368,18 +368,6 @@ class WC_SC extends WC_Payment_Gateway
         $params['total_amount']     = SC_Versions_Resolver::get_order_data($order, 'order_total');
         $params['currency']         = get_woocommerce_currency();
         
-//        echo 'sum prices: <pre>'.print_r($order->get_subtotal(),true).'</pre>';
-//        echo 'get_tax_totals: <pre>'.print_r($order->get_tax_totals(),true).'</pre>';
-//        echo 'get_total_tax: <pre>'.print_r($order->get_total_tax(),true).'</pre>';
-//        echo 'get_total_tax: <pre>'.print_r(WC_Tax::get_rates(),true).'</pre>';
-//        
-//        echo 'total discount: <pre>'.print_r($params['discount'], true).'</pre>';
-//        echo 'handling: <pre>'.print_r($params['handling'], true).'</pre>';
-//        echo 'total_amount: <pre>'.print_r($params['total_amount'],true).'</pre>';
-//        echo 'params: <pre>'.print_r($params,true).'</pre>';
-        
-        //die;
-        
         $for_hash = '';
 		foreach($params as $k=>$v){
 			$for_hash .= $v;
