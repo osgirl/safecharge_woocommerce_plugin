@@ -42,8 +42,8 @@ Please, contact out Tech-Support team (tech-support@safecharge.com) in case of q
 
 == Changelog ==
 
+= 1.2 - 2017-09-27 =
+* Add - Support for Refund.
+
 = 1.1 - 2017-08-23 =
 * Add - Support for Dynamic Pricing including tax calculation and discount.
-
-= 1.2 - 2017-08-23 =
-* Add - Support for Refund.
