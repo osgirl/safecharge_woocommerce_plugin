@@ -102,8 +102,8 @@ class WC_SC extends WC_Payment_Gateway
                 'type' => 'select',
                 'label' => __('Choose Hash type provided by '. SC_GATEWAY_TITLE, 'sc'),
                 'options' => array(
-                    'md5' => 'md5',
                     'sha256' => 'sha256',
+                    'md5' => 'md5',
                 )
             ),
             'test' => array(
