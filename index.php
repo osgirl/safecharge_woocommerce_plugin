@@ -17,9 +17,9 @@ if(!defined('ABSPATH')) {
 define('SC_GATEWAY_TITLE', 'SafeCharge');
 // common notify URL for the plugin
 define('SC_NOTIFY_URL', add_query_arg(array('wc-api' => 'WC_Gateway_SC'), home_url('/')));
-// some keys for order metadata
-define('SC_AUTH_CODE_KEY', 'authCode');
-define('SC_GW_TRANS_ID_KEY', 'relatedTransactionId');
+// some keys for order metadata, we make them hiden when starts with underscore
+define('SC_AUTH_CODE_KEY', '_authCode');
+define('SC_GW_TRANS_ID_KEY', '_relatedTransactionId');
 
 add_action('plugins_loaded', 'woocommerce_sc_init', 0);
 
