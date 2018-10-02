@@ -92,12 +92,6 @@ function create_log($data, $title = '')
 // we come here after DMN redirect
 function sc_enqueue($hook)
 {
-    // add to the log the REQUEST_URIs to view REST API response
-    // TODO remove this when get what you need!
-//    if(!empty($_SERVER['REQUEST_URI'])) {
-//        create_log($_SERVER['REQUEST_URI'], 'Requested URL: ');
-//    }
-    
     // when we get DMN from Cashier
     if(
         isset($_REQUEST['Status'], $_REQUEST['wc-api'])
@@ -140,27 +134,26 @@ function sc_enqueue($hook)
     // TODO when we get DMN from REST API about the refund save Order Note
     
     
-    // Do not use this until implementation of REST api... then the script will be different :)
-//    include_once("token.php");
-//    
-//    $timestamp= time();
-//    $g = new WC_SC;
-//    $g->setEnvironment();
-//    
-//    $plugin_dir = basename(dirname(__FILE__));
-//    
-//    wp_register_script("sc_js_script", WP_PLUGIN_URL . '/' . $plugin_dir . '/js/sc.js', array('jquery') );
-//    wp_localize_script(
-//        'sc_js_script',
-//        'myAjax',
-//        array(
-//            'ajaxurl' => WP_PLUGIN_URL . '/' . $plugin_dir .'/ajax/getAPMs.php',
-//            'token' =>generateToken($timestamp),
-//            't'=>$timestamp
-//        )
-//    );  
-//    wp_enqueue_script( 'jquery' );
-//    wp_enqueue_script( 'sc_js_script' );
+    include_once("token.php");
+    
+    $timestamp= time();
+    $g = new WC_SC;
+    $g->setEnvironment();
+    
+    $plugin_dir = basename(dirname(__FILE__));
+    
+    wp_register_script("sc_js_script", WP_PLUGIN_URL . '/' . $plugin_dir . '/js/sc.js', array('jquery') );
+    wp_localize_script(
+        'sc_js_script',
+        'myAjax',
+        array(
+            'ajaxurl' => WP_PLUGIN_URL . '/' . $plugin_dir .'/ajax/getAPMs.php',
+            'token' =>generateToken($timestamp),
+            't'=>$timestamp
+        )
+    );  
+    wp_enqueue_script( 'jquery' );
+    wp_enqueue_script( 'sc_js_script' );
 }
 
 function sc_show_final_text()

@@ -86,8 +86,8 @@ class WC_SC_Refund extends WC_Order_Refund
             'Content-Type:application/json', 'Content-Length: ' . strlen($json_post))
         );
         curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
-        curl_setopt($ch, CURLOPT_SSL_VERIFYPEER, false);
-        curl_setopt($ch, CURLOPT_SSL_VERIFYHOST, false);
+        curl_setopt($ch, CURLOPT_SSL_VERIFYPEER, false);
+        curl_setopt($ch, CURLOPT_SSL_VERIFYHOST, false);
         
         $resp = curl_exec($ch);
         curl_close ($ch);

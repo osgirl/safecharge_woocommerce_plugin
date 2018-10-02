@@ -6,6 +6,18 @@ if (session_status() == PHP_SESSION_NONE) {
 
 class WC_SC extends WC_Payment_Gateway
 {
+    private $liveurl    = 'https://secure.safecharge.com/ppp/purchase.do';
+    private $testurl    = 'https://ppp-test.safecharge.com/ppp/purchase.do';
+    
+    private $liveWSDL   = 'https://secure.xtpayments.com/PaymentOptionInfoService?wsdl';
+    private $testWSDL   = 'https://ppp-test.safecharge.com/PaymentOptionInfoService?wsdl';
+    
+    private $live_session_token_url = 'https://secure.safecharge.com/ppp/api/v1/getSessionToken.do';
+    private $test_session_token_url = 'https://ppp-test.safecharge.com/ppp/api/v1/getSessionToken.do';
+    
+    private $live_merch_paym_methods_url = 'https://secure.safecharge.com/ppp/api/v1/getMerchantPaymentMethods.do';
+    private $test_merch_paym_methods_url = 'https://ppp-test.safecharge.com/ppp/api/v1/getMerchantPaymentMethods.do';
+    
     public function __construct()
     {
         include_once(  plugin_dir_path( __FILE__ ) . 'sc_versions_resolver.php' );
@@ -35,18 +47,13 @@ class WC_SC extends WC_Payment_Gateway
 		$this -> show_thanks_msg = $this->settings['show_thanks_msg'];
 		$this -> hash_type = isset($this->settings['hash_type'])
             ? $this->settings['hash_type'] : 'md5';
-		$this -> end_point = isset($this->settings['end_point'])
-            ? $this->settings['end_point'] : 'cashier';
+		$this -> payment_api = isset($this->settings['payment_api'])
+            ? $this->settings['payment_api'] : 'cashier';
 	//	$this -> load_payment_options = $this -> settings['load_payment_options'];
         
 		$_SESSION['merchant_id'] = $this -> merchant_id;
 		$_SESSION['merchantsite_id'] = $this -> merchantsite_id;
 		
-		$this -> liveurl = 'https://secure.safecharge.com/ppp/purchase.do';
-		$this -> testurl = 'https://ppp-test.safecharge.com/ppp/purchase.do';
-		$this -> liveWSDL = 'https://secure.xtpayments.com/PaymentOptionInfoService?wsdl';
-		$this -> testWSDL = 'https://ppp-test.safecharge.com/PaymentOptionInfoService?wsdl';
-        
 		$this -> msg['message'] = "";
 		$this -> msg['class'] = "";
 
@@ -56,7 +63,11 @@ class WC_SC extends WC_Payment_Gateway
 		add_action('woocommerce_api_wc_gateway_sc', array($this, 'process_sc_notification'));
 	}
 
-	function init_form_fields()
+    /**
+     * Function init_form_fields
+     * Set all fields for admin settings page.
+     */
+	public function init_form_fields()
     {
        $this -> form_fields = array(
             'enabled' => array(
@@ -108,7 +119,7 @@ class WC_SC extends WC_Payment_Gateway
                     'md5' => 'md5',
                 )
             ),
-            'end_point' => array(
+            'payment_api' => array(
                 'title' => __('Payment API', 'sc'),
                 'type' => 'select',
                 'description' => __('Select '. SC_GATEWAY_TITLE .' payment API', 'sc'),
@@ -152,63 +163,22 @@ class WC_SC extends WC_Payment_Gateway
 	/**
      *  Add fields on the payment page
      **/
-    function payment_fields()
+    public function payment_fields()
     {
-		if($this -> description)
+		if($this -> description) {
             echo wpautop(wptexturize($this -> description));
-		
-//        $apms = $this->getAPMS();
-//        if ($apms)
-//            echo $apms;
-    }
-
-    // in paymen page shows SafeCharge sub-option and available payment methods
-	function showAPMs($apms)
-    {
-		$data='<br />';
-		
-        if(isset($apms["PaymentOptionsDetails"]["displayInfo"])) {
-			$logo = $this -> plugin_url.'icons/'.utf8_encode($apms["PaymentOptionsDetails"]["optionName"]).'.png';
-			$logo2 = $this->plugin_path.'icons/'.utf8_encode($apms["PaymentOptionsDetails"]["optionName"]).'.png';
-			
-            $data .=
-                '<input id="payment_method_'.$this->id.'_'.$apms["PaymentOptionsDetails"]["optionName"].'" type="radio" class="input-radio" name="payment_method_sc" value="'.$this->id.'_'.$apms["PaymentOptionsDetails"]["optionName"].'"  />'
-                .'<label for="payment_method_'.$this->id.'_'.$apms["PaymentOptionsDetails"]["optionName"].'">'
-                    .utf8_encode($apms["PaymentOptionsDetails"]["displayInfo"]["paymentOptionDisplayName"]).' ';
-			
-            if (file_exists($logo2)) {
-                $data .= '<img src="'.$this -> plugin_url.'icons/'.utf8_encode($apms["PaymentOptionsDetails"]["optionName"]).'.png" height="30px">';
-            }
-			
-            $data .= '</label>';
-		}
-        else if(isset($apms["PaymentOptionsDetails"])) {
-			foreach($apms["PaymentOptionsDetails"] as $apmDetails) {
-				$logo = $this -> plugin_url.'icons/'.utf8_encode($apmDetails["optionName"]).'.png';
-				$logo2 = $this->plugin_path.'icons/'.utf8_encode($apmDetails["optionName"]).'.png';
-				
-                $data .=
-                    '<div style="paddin:10px 0px;">'
-                        .'<input id="payment_method_'.$this->id.'_'.$apmDetails["optionName"].'" type="radio" class="input-radio" name="payment_method_sc" value="'.$this->id.'_'.$apmDetails["optionName"].'"  />'
-                        .'<label for="payment_method_'.$this->id.'_'.$apmDetails["optionName"].'" >'
-                            .utf8_encode($apmDetails["displayInfo"]["paymentOptionDisplayName"]).' ';
-				
-                if (file_exists($logo2)) {
-                    $data .= '<img src="'.$logo.'" style="height:20px;">';
-                }
-				
-                $data .= '</label>'
-                    .'</div>';
-			}
-		}
+        }
         
-		return $data;
-	}
+        $apms = $this->getAPMS();
+        if ($apms) {
+            echo $apms;
+        }
+    }
 
 	/**
      * Receipt Page
      **/
-    function receipt_page($order_id)
+    public function receipt_page($order_id)
     {
        $this->generate_sc_form($order_id);
     }
@@ -455,7 +425,7 @@ class WC_SC extends WC_Payment_Gateway
     /**
      * Check for valid callback
      **/
-    function process_sc_notification()
+    public function process_sc_notification()
     {
         global $woocommerce;
 
@@ -551,13 +521,13 @@ class WC_SC extends WC_Payment_Gateway
 		}
 	}
 
-	function showMessage($content)
+	public function showMessage($content)
     {
         return '<div class="box '.$this -> msg['class'].'-box">'.$this -> msg['message'].'</div>'.$content;
     }
 
      // get all pages
-    function get_pages($title = false, $indent = true)
+    public function get_pages($title = false, $indent = true)
     {
         $wp_pages = get_pages('sort_column=menu_order');
         $page_list = array();
@@ -584,7 +554,7 @@ class WC_SC extends WC_Payment_Gateway
         return $page_list;
     }
 
-	function checkAdvancedCheckSum()
+	public function checkAdvancedCheckSum()
     {
         if (isset($_GET['advanceResponseChecksum'])){
             $str = md5($this->secret.$_GET['totalAmount'].$_GET['currency']
@@ -600,24 +570,138 @@ class WC_SC extends WC_Payment_Gateway
             return false;
 	}
     
-    function setEnvironment()
+    public function setEnvironment()
     {
 		if ($this->test == 'yes'){
 			$this->useWSDL = $this->testWSDL;
+            $this->use_sess_token_url = $this->test_session_token_url;
+            $this->use_session_token_url = $this->test_session_token_url;
+            $this->use_merch_paym_meth_url = $this->test_merch_paym_methods_url;
 		}
         else {
 			$this->useWSDL = $this->liveWSDL;
+            $this->use_sess_token_url = $this->live_session_token_url;
+            $this->use_session_token_url = $this->live_session_token_url;
+            $this->use_merch_paym_meth_url = $this->live_merch_paym_methods_url;
 		}
 	}
     
+    /**
+     * Function getAPMS
+     * Get and return APMS, depending of payment API.
+     * 
+     * @global object $woocommerce
+     * @return boolean|string
+     */
     private function getAPMS()
     {
+        $cl = new WC_Customer;
+		$this->setEnvironment();
+        
+        // for REST APMS
+        if($this->payment_api == 'rest') {
+            # getSessionToken
+            $time = date('YmdHis', time());
+            
+            $params = array(
+                'merchantId'        => $this->merchant_id,
+                'merchantSiteId'    => $this->merchantsite_id,
+                'clientRequestId'   => $time. '_' .uniqid(),
+                'timeStamp'         => $time,
+            );
+            
+            $checksum = '';
+            foreach($params as $val) {
+                $checksum .= $val;
+            }
+            
+            $checksum .= $this->secret;
+            
+            $params['checksum'] = hash($this->hash_type, $checksum);
+            $json_post = json_encode($params);
+            
+            $this->create_log($params, 'rest apms params: ');
+            
+            // create cURL post
+            $ch = curl_init();
+            
+            curl_setopt($ch, CURLOPT_URL, $this->use_session_token_url);
+            curl_setopt($ch, CURLOPT_CUSTOMREQUEST, "POST");
+            curl_setopt($ch, CURLOPT_POSTFIELDS, $json_post);
+            curl_setopt($ch, CURLOPT_HTTPHEADER, array(
+                'Content-Type:application/json', 'Content-Length: ' . strlen($json_post))
+            );
+            curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
+            curl_setopt($ch, CURLOPT_SSL_VERIFYPEER, false);
+            curl_setopt($ch, CURLOPT_SSL_VERIFYHOST, false);
+
+            $resp = curl_exec($ch);
+            curl_close ($ch);
+            
+            $resp_arr = json_decode($resp, true);
+            
+            if(
+                !$resp_arr
+                || !is_array($resp_arr)
+                || !isset($resp_arr['status'])
+                || $resp_arr['status'] != 'SUCCESS'
+            ) {
+                $this->create_log($resp, 'getting getSessionToken error: ');
+                return false;
+            }
+            # getSessionToken END
+            
+            # get merchant payment methods
+            $params = array(
+                'sessionToken'      => $resp_arr['sessionToken'],
+                'merchantId'        => $this->merchant_id,
+                'merchantSiteId'    => $this->merchantsite_id,
+                'clientRequestId'   => $time. '_' .uniqid(),
+                'currencyCode'      => get_woocommerce_currency(), // optional
+                'countryCode'       => (isset($_SESSION['sc_country']) && !empty($_SESSION['sc_country']))
+                    ? $_SESSION['sc_country'] : SC_Versions_Resolver::get_client_country($cl), // optional
+                'languageCode'      => $this->formatLocation(get_locale()), // optional
+                'type'              => '', // optional
+                'timeStamp'         => $time,
+            );
+            
+            $params['checksum'] = hash(
+                $this->hash_type,
+                $params['merchantId'] . $params['merchantSiteId'] . $params['clientRequestId']
+                    .$params['timeStamp'] . $this->secret
+            );
+            
+            $json_post = json_encode($params);
+            
+            // get paymenth methods
+            $ch = curl_init();
+            
+            curl_setopt($ch, CURLOPT_URL, $this->use_merch_paym_meth_url);
+            curl_setopt($ch, CURLOPT_CUSTOMREQUEST, "POST");
+            curl_setopt($ch, CURLOPT_POSTFIELDS, $json_post);
+            curl_setopt($ch, CURLOPT_HTTPHEADER, array(
+                'Content-Type:application/json', 'Content-Length: ' . strlen($json_post))
+            );
+            curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
+            curl_setopt($ch, CURLOPT_SSL_VERIFYPEER, false);
+            curl_setopt($ch, CURLOPT_SSL_VERIFYHOST, false);
+
+            $resp = curl_exec($ch);
+            curl_close ($ch);
+            
+            $resp_arr = json_decode($resp, true);
+            return $this->showRESTAPMs($resp_arr);
+            # get merchant payment methods END
+        }
+        
+        // for Cashier APMS
+        // for the moment we do not get APS with below method
+        return false;
+        
 		include_once ('nusoap/nusoap.php');
 		global $woocommerce;
 		
-        $cl =  new WC_Customer;
-		$this->setEnvironment();
-		$client = new nusoap_client($this->useWSDL,true);
+		$client = new nusoap_client($this->useWSDL, true);
         
         $this->create_log($client, 'NuSoap Client data');
         
@@ -639,13 +723,87 @@ class WC_SC extends WC_Payment_Gateway
 		if ($this->load_payment_options == 'yes') {
 			try{
 				$soap_response = $client->call('getMerchantSitePaymentOptions', $parameters);
-				return $this->showAPMs($soap_response);
+				return $this->showWSDLAPMs($soap_response);
 			}
             catch(nusoap_fault $fault){
                 $this->create_log('error when try to get soap response');
 				return false;
 			}
 		}
+	}
+    
+    /**
+     * Function showRESTAPMs
+     * 
+     * In payment page shows SafeCharge sub-option and available payment methods.
+     * WSDL response structure is different than the REST API one.
+     * 
+     * @param array $apms
+     * @return string - html code
+     */
+    private function showRESTAPMs($apms)
+    {
+        if(!$apms || !is_array($apms) || !isset($apms) || count($apms['paymentMethods']) < 1) {
+            return '';
+        }
+        
+        $html='<br />';
+        
+        foreach($apms['paymentMethods'] as $data) {
+            
+        }
+        
+        return $html;
+    }
+    
+    /**
+     * Function showWSDLAPMs
+     * In payment page shows SafeCharge sub-option and available payment methods.
+     * WSDL response structure is different than the REST API one.
+     * 
+     * @param array $apms
+     * @return string - html code
+     */
+	private function showWSDLAPMs($apms)
+    {
+		$data='<br />';
+		
+        if(isset($apms["PaymentOptionsDetails"]["displayInfo"])) {
+			$logo = $this -> plugin_url.'icons/'.utf8_encode($apms["PaymentOptionsDetails"]["optionName"]).'.png';
+			$logo2 = $this->plugin_path.'icons/'.utf8_encode($apms["PaymentOptionsDetails"]["optionName"]).'.png';
+			
+            $data .=
+                '<input id="payment_method_'.$this->id.'_'.$apms["PaymentOptionsDetails"]["optionName"].'" type="radio" class="input-radio" name="payment_method_sc" value="'.$this->id.'_'.$apms["PaymentOptionsDetails"]["optionName"].'"  />'
+                .'<label for="payment_method_'.$this->id.'_'.$apms["PaymentOptionsDetails"]["optionName"].'">'
+                    .utf8_encode($apms["PaymentOptionsDetails"]["displayInfo"]["paymentOptionDisplayName"]).' ';
+			
+            if (file_exists($logo2)) {
+                $data .= '<img src="'.$this -> plugin_url.'icons/'.utf8_encode($apms["PaymentOptionsDetails"]["optionName"]).'.png" height="30px">';
+            }
+			
+            $data .= '</label>';
+		}
+        else if(isset($apms["PaymentOptionsDetails"])) {
+			foreach($apms["PaymentOptionsDetails"] as $apmDetails) {
+				$logo = $this -> plugin_url.'icons/'.utf8_encode($apmDetails["optionName"]).'.png';
+				$logo2 = $this->plugin_path.'icons/'.utf8_encode($apmDetails["optionName"]).'.png';
+				
+                $data .=
+                    '<div style="paddin:10px 0px;">'
+                        .'<input id="payment_method_'.$this->id.'_'.$apmDetails["optionName"].'" type="radio" class="input-radio" name="payment_method_sc" value="'.$this->id.'_'.$apmDetails["optionName"].'"  />'
+                        .'<label for="payment_method_'.$this->id.'_'.$apmDetails["optionName"].'" >'
+                            .utf8_encode($apmDetails["displayInfo"]["paymentOptionDisplayName"]).' ';
+				
+                if (file_exists($logo2)) {
+                    $data .= '<img src="'.$logo.'" style="height:20px;">';
+                }
+				
+                $data .= '</label>'
+                    .'</div>';
+			}
+		}
+        
+		return $data;
 	}
     
     private function formatLocation($locale)
