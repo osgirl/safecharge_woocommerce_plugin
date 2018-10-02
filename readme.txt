@@ -7,7 +7,7 @@ Wordpress requirements:
 WooCommerce requirements: 
 	- minimum v 3.0
 	- tested up to v3.4
-Stable tag: 1.1
+Stable tag: 1.2
 
 == Description ==
 
@@ -42,8 +42,11 @@ Please, contact out Tech-Support team (tech-support@safecharge.com) in case of q
 
 == Changelog ==
 
-= 1.2 - 2017-09-27 =
+= 1.3 - 2018-10-02 =
+* Add - Started work on REST API integration for payments.
+
+= 1.2 - 2018-09-27 =
 * Add - Support for Refund.
 
-= 1.1 - 2017-08-23 =
+= 1.1 - 2018-08-23 =
 * Add - Support for Dynamic Pricing including tax calculation and discount.

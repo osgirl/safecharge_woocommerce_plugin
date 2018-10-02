@@ -35,6 +35,8 @@ class WC_SC extends WC_Payment_Gateway
 		$this -> show_thanks_msg = $this->settings['show_thanks_msg'];
 		$this -> hash_type = isset($this->settings['hash_type'])
             ? $this->settings['hash_type'] : 'md5';
+		$this -> end_point = isset($this->settings['end_point'])
+            ? $this->settings['end_point'] : 'cashier';
 	//	$this -> load_payment_options = $this -> settings['load_payment_options'];
         
 		$_SESSION['merchant_id'] = $this -> merchant_id;
@@ -100,10 +102,19 @@ class WC_SC extends WC_Payment_Gateway
             'hash_type' => array(
                 'title' => __('Hash type', 'sc'),
                 'type' => 'select',
-                'label' => __('Choose Hash type provided by '. SC_GATEWAY_TITLE, 'sc'),
+                'description' => __('Choose Hash type provided by '. SC_GATEWAY_TITLE, 'sc'),
                 'options' => array(
                     'sha256' => 'sha256',
                     'md5' => 'md5',
+                )
+            ),
+            'end_point' => array(
+                'title' => __('Payment API', 'sc'),
+                'type' => 'select',
+                'description' => __('Select '. SC_GATEWAY_TITLE .' payment API', 'sc'),
+                'options' => array(
+                    'cashier' => 'Cashier',
+                    'rest' => 'REST API',
                 )
             ),
             'test' => array(
