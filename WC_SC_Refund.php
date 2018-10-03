@@ -24,6 +24,8 @@ class WC_SC_Refund extends WC_Order_Refund
     public function __construct()
     {
         require_once 'WC_SC.php';
+        require_once 'SC_API_Caller.php';
+        
         $gateway = new WC_SC();
         $this->settings = $gateway->settings;
         
@@ -38,8 +40,6 @@ class WC_SC_Refund extends WC_Order_Refund
     
     public function sc_refund_order()
     {
-        include_once 'SC_API_Caller.php';
-        
         $request = $_REQUEST;
         $order = new WC_Order((int)$_REQUEST['order_id'] );
         $refunds = $order->get_refunds();
@@ -133,55 +133,5 @@ class WC_SC_Refund extends WC_Order_Refund
         $order->save();
         
         wp_send_json_success();
-    }
-    
-    /**
-     * Function create_log
-     * Create logs
-     * 
-     * @param mixed $data
-     * @param string $title - title of the printed log
-     */
-    private function create_log($data, $title = '')
-    {
-        if(!defined('WP_DEBUG') || WP_DEBUG === false) {
-            return;
-        }
-        
-        $file = plugin_dir_path( __FILE__ ) . 'logs' . DIRECTORY_SEPARATOR . date("Y-m-d") . '.txt';
-        $d = '';
-        
-        if(is_array($data) || is_object($data)) {
-            $d = print_r($data, true);
-        //    $d = mb_convert_encoding($d, 'UTF-8');
-            $d = '<pre>'.$d.'</pre>';
-        }
-        elseif(is_string($data)) {
-        //    $d = mb_convert_encoding($data, 'UTF-8');
-            $d = '<pre>'.$d.'</pre>';
-        }
-        elseif(is_bool($data)) {
-            $d = $data ? 'true' : 'false';
-            $d = '<pre>'.$d.'</pre>';
-        }
-        else {
-            $d = '<pre>'.$data.'</pre>';
-        }
-        
-        if(!empty($title)) {
-            $d = '<h3>'.$title.'</h3>'."\r\n".$d;
-        }
-        
-        try {
-            file_put_contents($file, date('H:i:s') . ': ' . $d."\r\n"."\r\n", FILE_APPEND);
-        }
-        catch (Exception $exc) {
-            echo
-                '<script>'
-                    .'error.log("Log file was not created, by reason: '.$exc.'");'
-                    .'console.log("Log file was not created, by reason: '.$data.'");'
-                .'</script>';
-        }
-
     }
 }

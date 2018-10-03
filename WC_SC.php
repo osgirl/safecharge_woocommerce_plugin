@@ -18,9 +18,13 @@ class WC_SC extends WC_Payment_Gateway
     private $live_merch_paym_methods_url = 'https://secure.safecharge.com/ppp/api/v1/getMerchantPaymentMethods.do';
     private $test_merch_paym_methods_url = 'https://ppp-test.safecharge.com/ppp/api/v1/getMerchantPaymentMethods.do';
     
+    private $live_pay_apm_url = 'https://secure.safecharge.com/ppp/api/v1/paymentAPM.do';
+    private $test_pay_apm_url = 'https://ppp-test.safecharge.com/ppp/api/v1/paymentAPM.do';
+    
     public function __construct()
     {
-        include_once(  plugin_dir_path( __FILE__ ) . 'sc_versions_resolver.php' );
+        require_once plugin_dir_path( __FILE__ ) . 'sc_versions_resolver.php';
+        require_once 'SC_API_Caller.php';
         
         $plugin_dir = basename(dirname(__FILE__));
         $this -> plugin_path = plugin_dir_path( __FILE__ ) . $plugin_dir . '/';
@@ -193,7 +197,7 @@ class WC_SC extends WC_Payment_Gateway
 		$TimeStamp = date('Ymdhis');
         $order = new WC_Order($order_id);
         
-        $this->create_log($order, "the order data: ");
+        SC_API_Caller::create_log($order, "the order data: ");
         
         $order->add_order_note("User is redicted to Safecharge Payment page");
         $order->save();
@@ -362,7 +366,7 @@ class WC_SC extends WC_Payment_Gateway
             $params_array[] = "<input type='hidden' name='$key' value='$value'/>";
         }
         
-        $this->create_log($params, 'Order params');
+        SC_API_Caller::create_log($params, 'Order params');
         
         $html =
             '<form action="'.$this -> URL.'" method="post" id="sc_payment_form">'
@@ -573,16 +577,18 @@ class WC_SC extends WC_Payment_Gateway
     public function setEnvironment()
     {
 		if ($this->test == 'yes'){
-			$this->useWSDL = $this->testWSDL;
-            $this->use_sess_token_url = $this->test_session_token_url;
-            $this->use_session_token_url = $this->test_session_token_url;
-            $this->use_merch_paym_meth_url = $this->test_merch_paym_methods_url;
+			$this->useWSDL                  = $this->testWSDL;
+            $this->use_sess_token_url       = $this->test_session_token_url;
+            $this->use_session_token_url    = $this->test_session_token_url;
+            $this->use_merch_paym_meth_url  = $this->test_merch_paym_methods_url;
+            $this->use_pay_apm_url          = $this->live_pay_apm_url;
 		}
         else {
-			$this->useWSDL = $this->liveWSDL;
-            $this->use_sess_token_url = $this->live_session_token_url;
-            $this->use_session_token_url = $this->live_session_token_url;
-            $this->use_merch_paym_meth_url = $this->live_merch_paym_methods_url;
+			$this->useWSDL                  = $this->liveWSDL;
+            $this->use_sess_token_url       = $this->live_session_token_url;
+            $this->use_session_token_url    = $this->live_session_token_url;
+            $this->use_merch_paym_meth_url  = $this->live_merch_paym_methods_url;
+            $this->use_pay_apm_url          = $this->test_pay_apm_url;
 		}
 	}
     
@@ -600,8 +606,6 @@ class WC_SC extends WC_Payment_Gateway
         
         // for REST APMS
         if($this->payment_api == 'rest') {
-            include_once 'SC_API_Caller.php';
-            
             # getSessionToken
             $time = date('YmdHis', time());
             
@@ -620,7 +624,7 @@ class WC_SC extends WC_Payment_Gateway
                 || !isset($resp_arr['status'])
                 || $resp_arr['status'] != 'SUCCESS'
             ) {
-                $this->create_log($resp, 'getting getSessionToken error: ');
+                SC_API_Caller::create_log($resp_arr, 'getting getSessionToken error: ');
                 return false;
             }
             
@@ -664,7 +668,7 @@ class WC_SC extends WC_Payment_Gateway
 		
 		$client = new nusoap_client($this->useWSDL, true);
         
-        $this->create_log($client, 'NuSoap Client data');
+        SC_API_Caller::create_log($client, 'NuSoap Client data');
         
 		$parameters = array(
             "merchantId"        => $this->merchant_id,
@@ -678,8 +682,8 @@ class WC_SC extends WC_Payment_Gateway
                 ? $_SESSION['sc_country'] : SC_Versions_Resolver::get_client_country($cl),
         );
         
-        $this->create_log($parameters, 'getAPMS params: ');
-        $this->create_log($_SESSION, '$_SESSION: ');
+        SC_API_Caller::create_log($parameters, 'getAPMS params: ');
+        SC_API_Caller::create_log($_SESSION, '$_SESSION: ');
 		
 		if ($this->load_payment_options == 'yes') {
 			try{
@@ -687,7 +691,7 @@ class WC_SC extends WC_Payment_Gateway
 				return $this->showWSDLAPMs($soap_response);
 			}
             catch(nusoap_fault $fault){
-                $this->create_log('error when try to get soap response');
+                SC_API_Caller::create_log('error when try to get soap response');
 				return false;
 			}
 		}
@@ -708,11 +712,29 @@ class WC_SC extends WC_Payment_Gateway
             return '';
         }
         
-        $html='<br />';
+        $methods_fields = array();
+        $html = '<br />';
         
-        foreach($apms['paymentMethods'] as $data) {
+        foreach($apms['paymentMethods'] as $idx => $data) {
+            // add radio buttons for each payment method
+            $html .=
+                '<div style="paddin:10px 0px;">'
+                    .'<label>'
+                        .'<input id="payment_method_'.$data["paymentMethod"].'" type="radio" class="input-radio sc_payment_method_field" name="payment_method_sc" value="'.$data["paymentMethod"].'" />&nbsp;&nbsp;'
+                        .utf8_encode($data['paymentMethodDisplayName'][0]['message']).' '
+                        .'<img src="'.$data['logoURL'].'" style="height:20px;" onerror="this.style.display=\'none\'">'
+                    .'</label>'
+                .'</div>'
+                .'<br/>';
             
+            $methods_fields[$data["paymentMethod"]] = $data['fields'];
         }
+        
+        // show and hide payment methods fields with JQ
+        $html .=
+            '<script>var paymentMethods = '.json_encode($methods_fields).';</script>'
+            .file_get_contents(dirname(__FILE__).'/views/apms_js.php')
+            .file_get_contents(dirname(__FILE__).'/views/apms_modal.php');
         
         return $html;
     }
@@ -778,56 +800,6 @@ class WC_SC extends WC_Payment_Gateway
                 return 'en';
 		}
 	}
-
-    /**
-     * Function create_log
-     * Create logs
-     * 
-     * @param mixed $data
-     * @param string $title - title of the printed log
-     */
-    private function create_log($data, $title = '')
-    {
-        if(!defined('WP_DEBUG') || WP_DEBUG === false) {
-            return;
-        }
-        
-        $file = plugin_dir_path( __FILE__ ) . 'logs' . DIRECTORY_SEPARATOR . date("Y-m-d") . '.txt';
-        $d = '';
-        
-        if(is_array($data) || is_object($data)) {
-            $d = print_r($data, true);
-        //    $d = mb_convert_encoding($d, 'UTF-8');
-            $d = '<pre>'.$d.'</pre>';
-        }
-        elseif(is_string($data)) {
-        //    $d = mb_convert_encoding($data, 'UTF-8');
-            $d = '<pre>'.$d.'</pre>';
-        }
-        elseif(is_bool($data)) {
-            $d = $data ? 'true' : 'false';
-            $d = '<pre>'.$d.'</pre>';
-        }
-        else {
-            $d = '<pre>'.$data.'</pre>';
-        }
-        
-        if(!empty($title)) {
-            $d = '<h3>'.$title.'</h3>'."\r\n".$d;
-        }
-        
-        try {
-            file_put_contents($file, date('H:i:s') . ': ' . $d."\r\n"."\r\n", FILE_APPEND);
-        }
-        catch (Exception $exc) {
-            echo
-                '<script>'
-                    .'error.log("Log file was not created, by reason: '.$exc.'");'
-                    .'console.log("Log file was not created, by reason: '.$data.'");'
-                .'</script>';
-        }
-
-    }
 }
 
 ?>

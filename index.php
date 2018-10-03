@@ -47,49 +47,6 @@ function woocommerce_add_sc_gateway($methods)
     return $methods;
 }
 
-function create_log($data, $title = '')
-{
-    if(!defined('WP_DEBUG') || WP_DEBUG === false) {
-        return;
-    }
-
-    $file = plugin_dir_path( __FILE__ ) . 'logs' . DIRECTORY_SEPARATOR . date("Y-m-d") . '.txt';
-    $d = '';
-
-    if(is_array($data) || is_object($data)) {
-        $d = print_r($data, true);
-    //    $d = mb_convert_encoding($d, 'UTF-8');
-        $d = '<pre>'.$d.'</pre>';
-    }
-    elseif(is_string($data)) {
-    //    $d = mb_convert_encoding($data, 'UTF-8');
-        $d = '<pre>'.$d.'</pre>';
-    }
-    elseif(is_bool($data)) {
-        $d = $data ? 'true' : 'false';
-        $d = '<pre>'.$d.'</pre>';
-    }
-    else {
-        $d = '<pre>'.$data.'</pre>';
-    }
-
-    if(!empty($title)) {
-        $d = '<h3>'.$title.'</h3>'."\r\n".$d;
-    }
-
-    try {
-        file_put_contents($file, date('H:i:s') . ': ' . $d."\r\n"."\r\n", FILE_APPEND);
-    }
-    catch (Exception $exc) {
-        echo
-            '<script>'
-                .'error.log("Log file was not created, by reason: '.$exc.'");'
-                .'console.log("Log file was not created, by reason: '.$data.'");'
-            .'</script>';
-    }
-
-}
-
 // we come here after DMN redirect
 function sc_enqueue($hook)
 {
@@ -155,6 +112,13 @@ function sc_enqueue($hook)
     );  
     wp_enqueue_script( 'jquery' );
     wp_enqueue_script( 'sc_js_script' );
+    
+    // bootstrap modal
+    wp_register_script ('sc_bs_modal', WP_PLUGIN_URL. '/'. $plugin_dir. '/js/bootstrap.min.js', array( 'jquery' ), '1', true );
+    wp_register_style ('sc_bs_modal',  WP_PLUGIN_URL. '/'. $plugin_dir. '/css/sc_bs_modal.css', '' , '', 'all' );
+    
+    wp_enqueue_script( 'sc_bs_modal' );
+	wp_enqueue_style( 'sc_bs_modal' );
 }
 
 function sc_show_final_text()

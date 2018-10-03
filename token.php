@@ -1,14 +1,14 @@
 <?php
 
-define("G2S_TOCKEN", "Safe_Charge");
+define("SC_TOCKEN", "Safe_Charge");
 
 function generateToken($timestamp){
-	$str = explode("_", G2S_TOCKEN);
-	if (count($str)>1) {
-		$sec_token = $str[0].$timestamp.$str[count($str)-1];
+	$str = explode("_", SC_TOCKEN);
+	if (count($str) > 1) {
+		$sec_token = $str[0]. $timestamp. $str[count($str) - 1];
 	}
     else{
-		$sec_token = $str.$timestamp;
+		$sec_token = $str. $timestamp;
 	}
     
 	return md5($sec_token);
