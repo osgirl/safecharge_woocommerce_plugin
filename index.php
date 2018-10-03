@@ -20,6 +20,7 @@ define('SC_NOTIFY_URL', add_query_arg(array('wc-api' => 'WC_Gateway_SC'), home_u
 // some keys for order metadata, we make them hiden when starts with underscore
 define('SC_AUTH_CODE_KEY', '_authCode');
 define('SC_GW_TRANS_ID_KEY', '_relatedTransactionId');
+define('SC_LOG_FILE_PATH', plugin_dir_path( __FILE__ ). 'logs'. DIRECTORY_SEPARATOR. date("Y-m-d"). '.txt');
 
 add_action('plugins_loaded', 'woocommerce_sc_init', 0);
 

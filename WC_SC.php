@@ -600,6 +600,8 @@ class WC_SC extends WC_Payment_Gateway
         
         // for REST APMS
         if($this->payment_api == 'rest') {
+            include_once 'SC_API_Caller.php';
+            
             # getSessionToken
             $time = date('YmdHis', time());
             
@@ -610,35 +612,7 @@ class WC_SC extends WC_Payment_Gateway
                 'timeStamp'         => $time,
             );
             
-            $checksum = '';
-            foreach($params as $val) {
-                $checksum .= $val;
-            }
-            
-            $checksum .= $this->secret;
-            
-            $params['checksum'] = hash($this->hash_type, $checksum);
-            $json_post = json_encode($params);
-            
-            $this->create_log($params, 'rest apms params: ');
-            
-            // create cURL post
-            $ch = curl_init();
-            
-            curl_setopt($ch, CURLOPT_URL, $this->use_session_token_url);
-            curl_setopt($ch, CURLOPT_CUSTOMREQUEST, "POST");
-            curl_setopt($ch, CURLOPT_POSTFIELDS, $json_post);
-            curl_setopt($ch, CURLOPT_HTTPHEADER, array(
-                'Content-Type:application/json', 'Content-Length: ' . strlen($json_post))
-            );
-            curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
-            curl_setopt($ch, CURLOPT_SSL_VERIFYPEER, false);
-            curl_setopt($ch, CURLOPT_SSL_VERIFYHOST, false);
-
-            $resp = curl_exec($ch);
-            curl_close ($ch);
-            
-            $resp_arr = json_decode($resp, true);
+            $resp_arr = SC_API_Caller::call_rest_api($this->use_session_token_url, $params, $this->secret, $this->hash_type);
             
             if(
                 !$resp_arr
@@ -649,47 +623,34 @@ class WC_SC extends WC_Payment_Gateway
                 $this->create_log($resp, 'getting getSessionToken error: ');
                 return false;
             }
+            
+            $session_token = $resp_arr['sessionToken'];
             # getSessionToken END
             
             # get merchant payment methods
-            $params = array(
-                'sessionToken'      => $resp_arr['sessionToken'],
+            $checksum_params = array(
                 'merchantId'        => $this->merchant_id,
                 'merchantSiteId'    => $this->merchantsite_id,
                 'clientRequestId'   => $time. '_' .uniqid(),
+                'timeStamp'         => $time,
+            );
+            
+            $other_params = array(
+                'sessionToken'      => $resp_arr['sessionToken'],
                 'currencyCode'      => get_woocommerce_currency(), // optional
                 'countryCode'       => (isset($_SESSION['sc_country']) && !empty($_SESSION['sc_country']))
                     ? $_SESSION['sc_country'] : SC_Versions_Resolver::get_client_country($cl), // optional
                 'languageCode'      => $this->formatLocation(get_locale()), // optional
                 'type'              => '', // optional
-                'timeStamp'         => $time,
             );
             
-            $params['checksum'] = hash(
-                $this->hash_type,
-                $params['merchantId'] . $params['merchantSiteId'] . $params['clientRequestId']
-                    .$params['timeStamp'] . $this->secret
+            $resp_arr = SC_API_Caller::call_rest_api(
+                $this->use_merch_paym_meth_url,
+                $checksum_params,
+                $this->secret, $this->hash_type,
+                $other_params
             );
             
-            $json_post = json_encode($params);
-            
-            // get paymenth methods
-            $ch = curl_init();
-            
-            curl_setopt($ch, CURLOPT_URL, $this->use_merch_paym_meth_url);
-            curl_setopt($ch, CURLOPT_CUSTOMREQUEST, "POST");
-            curl_setopt($ch, CURLOPT_POSTFIELDS, $json_post);
-            curl_setopt($ch, CURLOPT_HTTPHEADER, array(
-                'Content-Type:application/json', 'Content-Length: ' . strlen($json_post))
-            );
-            curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
-            curl_setopt($ch, CURLOPT_SSL_VERIFYPEER, false);
-            curl_setopt($ch, CURLOPT_SSL_VERIFYHOST, false);
-
-            $resp = curl_exec($ch);
-            curl_close ($ch);
-            
-            $resp_arr = json_decode($resp, true);
             return $this->showRESTAPMs($resp_arr);
             # get merchant payment methods END
         }

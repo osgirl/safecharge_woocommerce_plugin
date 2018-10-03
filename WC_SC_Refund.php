@@ -38,6 +38,8 @@ class WC_SC_Refund extends WC_Order_Refund
     
     public function sc_refund_order()
     {
+        include_once 'SC_API_Caller.php';
+        
         $request = $_REQUEST;
         $order = new WC_Order((int)$_REQUEST['order_id'] );
         $refunds = $order->get_refunds();
@@ -55,58 +57,35 @@ class WC_SC_Refund extends WC_Order_Refund
             'relatedTransactionId'  => $order->get_meta(SC_GW_TRANS_ID_KEY), // GW Transaction ID
             'authCode'              => $order->get_meta(SC_AUTH_CODE_KEY),
             'comment'               => $refunds[0]->data['reason'], // optional
-            'urlDetails'            => array('notificationUrl' => SC_NOTIFY_URL),
+            'url'                   => SC_NOTIFY_URL,
             'timeStamp'             => $time,
         );
         
-        $checksum_str = '';
-        foreach($ref_parameters as $key => $val) {
-            if($key == 'urlDetails') {
-                $checksum_str .= $ref_parameters['urlDetails']['notificationUrl'];
-            }
-            else {
-                $checksum_str .= $val;
-            }
-        }
-        $checksum_str .= $this->settings['secret'];
-        
-        $ref_parameters['checksum'] = hash($this->settings['hash_type'], $checksum_str);
-        $json_post = json_encode($ref_parameters);
-        
-        $this->create_log($ref_parameters, '$ref_parameters: ');
-        $this->create_log($json_post, '$json_post: ');
-        
-        // create cURL post
-        $ch = curl_init();
-        
-        curl_setopt($ch, CURLOPT_URL, $this->use_refund_url);
-        curl_setopt($ch, CURLOPT_CUSTOMREQUEST, "POST");
-        curl_setopt($ch, CURLOPT_POSTFIELDS, $json_post);
-        curl_setopt($ch, CURLOPT_HTTPHEADER, array(
-            'Content-Type:application/json', 'Content-Length: ' . strlen($json_post))
+        $other_params = array(
+            'urlDetails'            => array('notificationUrl' => SC_NOTIFY_URL),
         );
-        curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
-        curl_setopt($ch, CURLOPT_SSL_VERIFYPEER, false);
-        curl_setopt($ch, CURLOPT_SSL_VERIFYHOST, false);
         
-        $resp = curl_exec($ch);
-        curl_close ($ch);
+        $json_arr = SC_API_Caller::call_rest_api(
+            $this->use_refund_url,
+            $ref_parameters,
+            $this->settings['secret'],
+            $this->settings['hash_type'],
+            $other_params
+        );
         
         $note = '';
         $error_note = 'Please check your e-mail for details and manually delete request Refund #'
             .$refunds[0]->id.' form the order or login into '. $this->use_cpanel_url
             .' and refund Transaction ID '.$order->get_meta(SC_GW_TRANS_ID_KEY);
         
-        if($resp === false){
+        if($json_arr === false){
             $note = __('The REST API retun false. '.$error_note, 'sc');
             $order -> add_order_note(__($note, 'sc'));
             $order->save();
             
             wp_send_json_success();
-        //    wp_send_json_error( array( 'error' => $note ) );
         }
         
-        $json_arr = json_decode($resp, true);
         if(!is_array($json_arr)) {
             parse_str($resp, $json_arr);
         }
@@ -117,10 +96,9 @@ class WC_SC_Refund extends WC_Order_Refund
             $order->save();
             
             wp_send_json_success();
-        //    wp_send_json_error( array( 'error' => $note ) );
         }
         
-        $this->create_log($json_arr, '$json_arr: ');
+        SC_API_Caller::create_log($json_arr, '$json_arr: ');
         
         // the status of the request
         if(isset($json_arr['status']) && $json_arr['status'] == 'ERROR') {
@@ -129,7 +107,6 @@ class WC_SC_Refund extends WC_Order_Refund
             $order->save();
             
             wp_send_json_success();
-        //    wp_send_json_error( array( 'error' => $note ) );
         }
         
         // check the transaction status
@@ -148,7 +125,6 @@ class WC_SC_Refund extends WC_Order_Refund
             $order->save();
             
             wp_send_json_success();
-        //    wp_send_json_error( array('error' => $note));
         }
         
         // create refund note
