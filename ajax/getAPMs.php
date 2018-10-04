@@ -2,7 +2,7 @@
 
 session_start();
 
-include("../token.php");
+include "../token.php";
 
 if (!checkToken($_POST["t"], $_POST["token"])) {
     die('no token generated');

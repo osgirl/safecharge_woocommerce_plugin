@@ -16,20 +16,24 @@ class SC_API_Caller
      * @param type $url - API URL
      * @param array $checksum_params - parameters we use for checksum
      * @param string $secret - merchant secret
-     * @param type $hash - merchant hash
-     * @param type $other_params - other parameters we use
+     * @param string $hash - merchant hash
+     * @param array $other_params - other parameters we use
+     * @param string $checksum - the checksum
      * 
      * @return mixed
      */
-    public static function call_rest_api($url, $checksum_params, $secret, $hash, $other_params = array())
+    public static function call_rest_api($url, $checksum_params, $secret, $hash, $other_params = array(), $checksum = '')
     {
-        $checksum = '';
-        foreach($checksum_params as $val) {
-            $checksum .= $val;
-        }
+        $checksum_params['checksum'] = $checksum;
+        
+        if($checksum == '') {
+            foreach($checksum_params as $val) {
+                $checksum .= $val;
+            }
 
-        $checksum .= $secret;
-        $checksum_params['checksum'] = hash($hash, $checksum);
+            $checksum .= $secret;
+            $checksum_params['checksum'] = hash($hash, $checksum);
+        }
         
         if(!empty($other_params) and is_array($other_params)) {
             $params = array_merge($checksum_params, $other_params);
@@ -40,7 +44,7 @@ class SC_API_Caller
         
         $json_post = json_encode($params);
 
-        self::create_log($params, 'rest params: ');
+    //    self::create_log($params, 'rest params: ');
         
         // create cURL post
         $ch = curl_init();

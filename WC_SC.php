@@ -1,29 +1,29 @@
 <?php
 
-if (session_status() == PHP_SESSION_NONE) {
+if (!session_id()) {
     session_start();
 }
 
 class WC_SC extends WC_Payment_Gateway
 {
-    private $liveurl    = 'https://secure.safecharge.com/ppp/purchase.do';
-    private $testurl    = 'https://ppp-test.safecharge.com/ppp/purchase.do';
+    # payments URLs
+    private $URL = '';
+    
+    // Cashier URLs
+    private $liveurl    = 'https://secure.safecharge.com/ppp/purchase.do'; // live
+    private $testurl    = 'https://ppp-test.safecharge.com/ppp/purchase.do'; // test
+    
+    // REST API URLs
+    private $live_pay_apm_url = 'https://secure.safecharge.com/ppp/api/v1/paymentAPM.do'; // live
+    private $test_pay_apm_url = 'https://ppp-test.safecharge.com/ppp/api/v1/paymentAPM.do'; // test
+    # payments URLs END
     
     private $liveWSDL   = 'https://secure.xtpayments.com/PaymentOptionInfoService?wsdl';
     private $testWSDL   = 'https://ppp-test.safecharge.com/PaymentOptionInfoService?wsdl';
     
-    private $live_session_token_url = 'https://secure.safecharge.com/ppp/api/v1/getSessionToken.do';
-    private $test_session_token_url = 'https://ppp-test.safecharge.com/ppp/api/v1/getSessionToken.do';
-    
-    private $live_merch_paym_methods_url = 'https://secure.safecharge.com/ppp/api/v1/getMerchantPaymentMethods.do';
-    private $test_merch_paym_methods_url = 'https://ppp-test.safecharge.com/ppp/api/v1/getMerchantPaymentMethods.do';
-    
-    private $live_pay_apm_url = 'https://secure.safecharge.com/ppp/api/v1/paymentAPM.do';
-    private $test_pay_apm_url = 'https://ppp-test.safecharge.com/ppp/api/v1/paymentAPM.do';
-    
     public function __construct()
     {
-        require_once plugin_dir_path( __FILE__ ) . 'sc_versions_resolver.php';
+        require_once plugin_dir_path( __FILE__ ) . 'SC_Versions_Resolver.php';
         require_once 'SC_API_Caller.php';
         
         $plugin_dir = basename(dirname(__FILE__));
@@ -46,7 +46,7 @@ class WC_SC extends WC_Payment_Gateway
 		$this -> merchantsite_id = $this -> settings['merchantsite_id'];
         $this -> secret = $this -> settings['secret'];
 		$this -> test = $this -> settings['test'];
-		$this -> URL = $this -> settings['URL'];
+	//	$this -> URL = $this -> settings['URL'];
 		$this -> show_thanks_msg = $this->settings['show_thanks_msg'];
 		$this -> show_thanks_msg = $this->settings['show_thanks_msg'];
 		$this -> hash_type = isset($this->settings['hash_type'])
@@ -55,9 +55,42 @@ class WC_SC extends WC_Payment_Gateway
             ? $this->settings['payment_api'] : 'cashier';
 	//	$this -> load_payment_options = $this -> settings['load_payment_options'];
         
-		$_SESSION['merchant_id'] = $this -> merchant_id;
-		$_SESSION['merchantsite_id'] = $this -> merchantsite_id;
-		
+        # set session variables for future use, like when we get APMs for a country
+		$_SESSION['merchant_id'] = $this->merchant_id;
+		$_SESSION['merchantsite_id'] = $this->merchantsite_id;
+        
+        $_SESSION['sc_country'] = SC_Versions_Resolver::get_client_country(new WC_Customer);
+        if(isset($_POST["country"]) && !empty($_POST["country"])) {
+            $_SESSION['sc_country'] = $_POST["country"];
+        }
+        
+        $_SESSION['currencyCode'] = get_woocommerce_currency();
+        $_SESSION['languageCode'] = $this->formatLocation(get_locale());
+        $_SESSION['payment_api'] = $this->payment_api;
+        $_SESSION['test'] = $this->test;
+        
+        // client request id 1
+        $time = date('YmdHis', time());
+        $_SESSION['cri1'] = $time. '_' .uniqid();
+        
+        // checksum 1 - checksum for session token
+        $_SESSION['cs1'] = hash(
+            $this->hash_type,
+            $this->merchant_id . $this->merchantsite_id . $_SESSION['cri1'] . $time . $this->secret
+        );
+        
+        // client request id 2
+        $time = date('YmdHis', time());
+        $_SESSION['cri2'] = $time. '_' .uniqid();
+        
+        // checksum 2 - checksum for get apms
+        $time = date('YmdHis', time());
+        $_SESSION['cs2'] = hash(
+            $this->hash_type,
+            $this->merchant_id . $this->merchantsite_id . $_SESSION['cri2'] . $time . $this->secret
+        );
+        # set session variables for future use END
+        
 		$this -> msg['message'] = "";
 		$this -> msg['class'] = "";
 
@@ -108,12 +141,12 @@ class WC_SC extends WC_Payment_Gateway
                 'type' => 'text',
                 'description' =>  __('Secret key is provided by '. SC_GATEWAY_TITLE, 'sc'),
             ),
-            'URL' => array(
-                'title' => __('Payment URL', 'sc'),
-                'type' => 'text',
-                'description' =>  __('Url to the payment gateway', 'sc'),
-                'default' => 'https://secure.safecharge.com/ppp/purchase.do'
-            ),
+//            'URL' => array(
+//                'title' => __('Payment URL', 'sc'),
+//                'type' => 'text',
+//                'description' =>  __('Url to the payment gateway', 'sc'),
+//                'default' => 'https://secure.safecharge.com/ppp/purchase.do'
+//            ),
             'hash_type' => array(
                 'title' => __('Hash type', 'sc'),
                 'type' => 'select',
@@ -173,7 +206,12 @@ class WC_SC extends WC_Payment_Gateway
             echo wpautop(wptexturize($this -> description));
         }
         
-        $apms = $this->getAPMS();
+        // This method is called twice, so make a check
+        $apms = false;
+        if(isset($_SESSION['sc_country']) && !empty($_SESSION['sc_country'])) {
+            $apms = $this->getAPMS();
+        }
+        
         if ($apms) {
             echo $apms;
         }
@@ -305,7 +343,14 @@ class WC_SC extends WC_Payment_Gateway
         // get and pass to cashier billing data END
         
         // get and pass to cashier hipping data
-        $sh_f_name = urlencode(preg_replace("/[[:punct:]]/", '', SC_Versions_Resolver::get_order_data($order, 'shipping_first_name')));
+        $sh_f_name = urlencode(
+            preg_replace(
+                "/[[:punct:]]/",
+                '',
+                SC_Versions_Resolver::get_order_data($order, 'shipping_first_name')
+            )
+        );
+        
         if(empty(trim($sh_f_name))) {
             $sh_f_name = $params['first_name'];
         }
@@ -362,6 +407,8 @@ class WC_SC extends WC_Payment_Gateway
 
         $params_array = array();
         
+        echo '<pre>'.print_r($_POST,true).'</pre>';
+        
         foreach($params as $key => $value){
             $params_array[] = "<input type='hidden' name='$key' value='$value'/>";
         }
@@ -395,7 +442,7 @@ class WC_SC extends WC_Payment_Gateway
         }
         
         $html .=
-                        'jQuery("#sc_payment_form").submit();'
+                        '//jQuery("#sc_payment_form").submit();'
                     .'});'
                 .'</script>'
             .'</form>';
@@ -510,7 +557,7 @@ class WC_SC extends WC_Payment_Gateway
 				}
 
 			}
-            else{
+            else {
 				$this -> msg['class'] = 'error';
 				$this -> msg['message'] = "Security Error. Illegal access detected";
 				$order -> update_status('failed');
@@ -578,17 +625,31 @@ class WC_SC extends WC_Payment_Gateway
     {
 		if ($this->test == 'yes'){
 			$this->useWSDL                  = $this->testWSDL;
-            $this->use_sess_token_url       = $this->test_session_token_url;
-            $this->use_session_token_url    = $this->test_session_token_url;
-            $this->use_merch_paym_meth_url  = $this->test_merch_paym_methods_url;
+            $this->use_session_token_url    = SC_TEST_SESSION_TOKEN_URL;
+            $this->use_merch_paym_meth_url  = SC_TEST_REST_PAYMENT_METHODS_URL;
             $this->use_pay_apm_url          = $this->live_pay_apm_url;
+            
+            // set payment URL
+            if($this->payment_api == 'cashier') {
+                $this->URL = $this->testurl;
+            }
+            elseif($this->payment_api == 'rest') {
+                $this->URL = $this->test_pay_apm_url;
+            }
 		}
         else {
 			$this->useWSDL                  = $this->liveWSDL;
-            $this->use_sess_token_url       = $this->live_session_token_url;
-            $this->use_session_token_url    = $this->live_session_token_url;
-            $this->use_merch_paym_meth_url  = $this->live_merch_paym_methods_url;
+            $this->use_session_token_url    = SC_LIVE_SESSION_TOKEN_URL;
+            $this->use_merch_paym_meth_url  = SC_LIVE_REST_PAYMENT_METHODS_URL;
             $this->use_pay_apm_url          = $this->test_pay_apm_url;
+            
+            // set payment URL
+            if($this->payment_api == 'cashier') {
+                $this->URL = $this->liveurl;
+            }
+            elseif($this->payment_api == 'rest') {
+                $this->URL = $this->live_pay_apm_url;
+            }
 		}
 	}
     
@@ -599,7 +660,7 @@ class WC_SC extends WC_Payment_Gateway
      * @global object $woocommerce
      * @return boolean|string
      */
-    private function getAPMS()
+    public function getAPMS()
     {
         $cl = new WC_Customer;
 		$this->setEnvironment();
@@ -627,8 +688,6 @@ class WC_SC extends WC_Payment_Gateway
                 SC_API_Caller::create_log($resp_arr, 'getting getSessionToken error: ');
                 return false;
             }
-            
-            $session_token = $resp_arr['sessionToken'];
             # getSessionToken END
             
             # get merchant payment methods
@@ -682,8 +741,8 @@ class WC_SC extends WC_Payment_Gateway
                 ? $_SESSION['sc_country'] : SC_Versions_Resolver::get_client_country($cl),
         );
         
-        SC_API_Caller::create_log($parameters, 'getAPMS params: ');
-        SC_API_Caller::create_log($_SESSION, '$_SESSION: ');
+    //    SC_API_Caller::create_log($parameters, 'getAPMS params: ');
+    //    SC_API_Caller::create_log($_SESSION, '$_SESSION: ');
 		
 		if ($this->load_payment_options == 'yes') {
 			try{
@@ -708,6 +767,7 @@ class WC_SC extends WC_Payment_Gateway
      */
     private function showRESTAPMs($apms)
     {
+        SC_API_Caller::create_log('showRESTAPMs()', 'function: ');
         if(!$apms || !is_array($apms) || !isset($apms) || count($apms['paymentMethods']) < 1) {
             return '';
         }
@@ -720,7 +780,7 @@ class WC_SC extends WC_Payment_Gateway
             $html .=
                 '<div style="paddin:10px 0px;">'
                     .'<label>'
-                        .'<input id="payment_method_'.$data["paymentMethod"].'" type="radio" class="input-radio sc_payment_method_field" name="payment_method_sc" value="'.$data["paymentMethod"].'" />&nbsp;&nbsp;'
+                        .'<input id="payment_method_'.$data["paymentMethod"].'" type="radio" class="input-radio sc_payment_method_field" name="payment_method_sc" value="'.$data["paymentMethod"].'" required />&nbsp;&nbsp;'
                         .utf8_encode($data['paymentMethodDisplayName'][0]['message']).' '
                         .'<img src="'.$data['logoURL'].'" style="height:20px;" onerror="this.style.display=\'none\'">'
                     .'</label>'
@@ -732,7 +792,9 @@ class WC_SC extends WC_Payment_Gateway
         
         // show and hide payment methods fields with JQ
         $html .=
-            '<script>var paymentMethods = '.json_encode($methods_fields).';</script>'
+            '<script>'
+                .'var paymentMethods = '.json_encode($methods_fields).';'
+            .'</script>'
             .file_get_contents(dirname(__FILE__).'/views/apms_js.php')
             .file_get_contents(dirname(__FILE__).'/views/apms_modal.php');
         
@@ -773,7 +835,7 @@ class WC_SC extends WC_Payment_Gateway
 				
                 $data .=
                     '<div style="paddin:10px 0px;">'
-                        .'<input id="payment_method_'.$this->id.'_'.$apmDetails["optionName"].'" type="radio" class="input-radio" name="payment_method_sc" value="'.$this->id.'_'.$apmDetails["optionName"].'"  />'
+                        .'<input id="payment_method_'.$this->id.'_'.$apmDetails["optionName"].'" type="radio" class="input-radio" name="payment_method_sc" value="'.$this->id.'_'.$apmDetails["optionName"].'" />'
                         .'<label for="payment_method_'.$this->id.'_'.$apmDetails["optionName"].'" >'
                             .utf8_encode($apmDetails["displayInfo"]["paymentOptionDisplayName"]).' ';
 				

@@ -14,13 +14,7 @@ if(!defined('ABSPATH')) {
     die;
 }
 
-define('SC_GATEWAY_TITLE', 'SafeCharge');
-// common notify URL for the plugin
-define('SC_NOTIFY_URL', add_query_arg(array('wc-api' => 'WC_Gateway_SC'), home_url('/')));
-// some keys for order metadata, we make them hiden when starts with underscore
-define('SC_AUTH_CODE_KEY', '_authCode');
-define('SC_GW_TRANS_ID_KEY', '_relatedTransactionId');
-define('SC_LOG_FILE_PATH', plugin_dir_path( __FILE__ ). 'logs'. DIRECTORY_SEPARATOR. date("Y-m-d"). '.txt');
+require_once 'sc_config.php';
 
 add_action('plugins_loaded', 'woocommerce_sc_init', 0);
 
@@ -36,6 +30,15 @@ function woocommerce_sc_init()
 	add_action('init', 'sc_enqueue');
 	add_action('woocommerce_thankyou_order_received_text', 'sc_show_final_text');
     add_action('woocommerce_create_refund', 'sc_create_refund');
+    // try to catch ajax
+    add_action( 'wp_ajax_my_action', 'my_action' );
+    add_action( 'wp_ajax_nopriv_my_action', 'my_action' );
+}
+
+function my_action()
+{
+    echo 'my_action()';
+    exit;
 }
 
 /**
@@ -92,22 +95,24 @@ function sc_enqueue($hook)
     // TODO when we get DMN from REST API about the refund save Order Note
     
     
-    include_once("token.php");
+//    include_once("token.php");
     
-    $timestamp= time();
-    $g = new WC_SC;
-    $g->setEnvironment();
-    
+//    $timestamp= time();
+//    $g = new WC_SC;
+//    $g->setEnvironment();
+//    
     $plugin_dir = basename(dirname(__FILE__));
-    
+//    
     wp_register_script("sc_js_script", WP_PLUGIN_URL . '/' . $plugin_dir . '/js/sc.js', array('jquery') );
     wp_localize_script(
         'sc_js_script',
         'myAjax',
         array(
-            'ajaxurl' => WP_PLUGIN_URL . '/' . $plugin_dir .'/ajax/getAPMs.php',
-            'token' =>generateToken($timestamp),
-            't'=>$timestamp
+        //    'ajaxurl' => WP_PLUGIN_URL . '/' . $plugin_dir .'/ajax/getAPMs.php',
+            'ajaxurl' => WP_PLUGIN_URL . '/' . $plugin_dir .'/SC_APMs_Getter.php',
+        //    'token' =>generateToken($timestamp),
+        //    't'=>$timestamp
+            
         )
     );  
     wp_enqueue_script( 'jquery' );

@@ -1,3 +1,4 @@
+<!-- we do not use this view at the moment -->
 <form action="<?= $this->URL ?>" method="post" id="sc_payment_form">
     <?php implode('', $params_array); ?>
     <noscript>
