@@ -23,8 +23,7 @@ class WC_SC extends WC_Payment_Gateway
     
     public function __construct()
     {
-        require_once plugin_dir_path( __FILE__ ) . 'SC_Versions_Resolver.php';
-        require_once 'SC_API_Caller.php';
+        require_once 'SC_Versions_Resolver.php';
         
         $plugin_dir = basename(dirname(__FILE__));
         $this -> plugin_path = plugin_dir_path( __FILE__ ) . $plugin_dir . '/';
@@ -56,38 +55,39 @@ class WC_SC extends WC_Payment_Gateway
 	//	$this -> load_payment_options = $this -> settings['load_payment_options'];
         
         # set session variables for future use, like when we get APMs for a country
-		$_SESSION['merchant_id'] = $this->merchant_id;
-		$_SESSION['merchantsite_id'] = $this->merchantsite_id;
+        $_SESSION['SC_Variables']['merchant_id']        = $this->merchant_id;
+        $_SESSION['SC_Variables']['merchantsite_id']    = $this->merchantsite_id;
+        $_SESSION['SC_Variables']['currencyCode']       = get_woocommerce_currency();
+        $_SESSION['SC_Variables']['languageCode']       = $this->formatLocation(get_locale());
+        $_SESSION['SC_Variables']['payment_api']        = $this->payment_api;
+        $_SESSION['SC_Variables']['test']               = $this->test;
         
-        $_SESSION['sc_country'] = SC_Versions_Resolver::get_client_country(new WC_Customer);
-        if(isset($_POST["country"]) && !empty($_POST["country"])) {
-            $_SESSION['sc_country'] = $_POST["country"];
+        $_SESSION['SC_Variables']['sc_country'] = SC_Versions_Resolver::get_client_country(new WC_Customer);
+        if(isset($_POST["billing_country"]) && !empty($_POST["billing_country"])) {
+            $_SESSION['SC_Variables']['sc_country'] = $_POST["billing_country"];
         }
-        
-        $_SESSION['currencyCode'] = get_woocommerce_currency();
-        $_SESSION['languageCode'] = $this->formatLocation(get_locale());
-        $_SESSION['payment_api'] = $this->payment_api;
-        $_SESSION['test'] = $this->test;
         
         // client request id 1
         $time = date('YmdHis', time());
-        $_SESSION['cri1'] = $time. '_' .uniqid();
+        $_SESSION['SC_Variables']['cri1'] = $time. '_' .uniqid();
         
         // checksum 1 - checksum for session token
-        $_SESSION['cs1'] = hash(
+        $_SESSION['SC_Variables']['cs1'] = hash(
             $this->hash_type,
-            $this->merchant_id . $this->merchantsite_id . $_SESSION['cri1'] . $time . $this->secret
+            $this->merchant_id . $this->merchantsite_id
+                . $_SESSION['SC_Variables']['cri1'] . $time . $this->secret
         );
         
         // client request id 2
         $time = date('YmdHis', time());
-        $_SESSION['cri2'] = $time. '_' .uniqid();
+        $_SESSION['SC_Variables']['cri2'] = $time. '_' .uniqid();
         
         // checksum 2 - checksum for get apms
         $time = date('YmdHis', time());
-        $_SESSION['cs2'] = hash(
+        $_SESSION['SC_Variables']['cs2'] = hash(
             $this->hash_type,
-            $this->merchant_id . $this->merchantsite_id . $_SESSION['cri2'] . $time . $this->secret
+            $this->merchant_id . $this->merchantsite_id
+                . $_SESSION['SC_Variables']['cri2'] . $time . $this->secret
         );
         # set session variables for future use END
         
@@ -198,7 +198,10 @@ class WC_SC extends WC_Payment_Gateway
     }
 
 	/**
-     *  Add fields on the payment page
+     * Function payment_fields
+     * 
+     *  Add fields on the payment page. Because we get APMs with Ajax
+     * here we add only AMPs fields modal.
      **/
     public function payment_fields()
     {
@@ -206,15 +209,8 @@ class WC_SC extends WC_Payment_Gateway
             echo wpautop(wptexturize($this -> description));
         }
         
-        // This method is called twice, so make a check
-        $apms = false;
-        if(isset($_SESSION['sc_country']) && !empty($_SESSION['sc_country'])) {
-            $apms = $this->getAPMS();
-        }
-        
-        if ($apms) {
-            echo $apms;
-        }
+        // output modal for APMs fields, if need
+        echo file_get_contents(dirname(__FILE__).'/views/apms_modal.php');
     }
 
 	/**
@@ -226,7 +222,14 @@ class WC_SC extends WC_Payment_Gateway
     }
 
 	 /**
-     * Generate pay button link
+      * Function generate_sc_form
+      * 
+      * The function generates form form the order fields and prepare to send
+      * them to the SC PPP.
+      * We can send this data to the cashier generating pay button link and form,
+      * or to the REST API as curl post.
+      * 
+      * @param int $order_id
      **/
     public function generate_sc_form($order_id)
     {
@@ -235,7 +238,10 @@ class WC_SC extends WC_Payment_Gateway
 		$TimeStamp = date('Ymdhis');
         $order = new WC_Order($order_id);
         
-        SC_API_Caller::create_log($order, "the order data: ");
+        $cust_fields = $order->get_meta_data();
+        $cust_fields2 = get_post_meta($order_id, 'payment_method_sc', true);
+        
+        $this->create_log($order, "the order data: ");
         
         $order->add_order_note("User is redicted to Safecharge Payment page");
         $order->save();
@@ -246,10 +252,12 @@ class WC_SC extends WC_Payment_Gateway
         $this->setEnvironment();
         
         $params['site_url'] = get_site_url();
+        // easy way to pass them to REST API
+        $params['items'] = array();
 		
         foreach ( $items as $item ) {
         //   echo '<pre>'.print_r($item, true).'</pre>';
-			$params['item_name_'.$i]        = ($item['name']);
+			$params['item_name_'.$i]        = $item['name'];
 			$params['item_number_'.$i]      = $item['product_id'];
             $params['item_quantity_'.$i]    = $item['qty'];
             
@@ -276,6 +284,12 @@ class WC_SC extends WC_Payment_Gateway
 			
             // Use this ONLY when the merchant is not using open amount and when there is an items table on their theme.
             //$params['item_discount_'.$i]    = number_format(($item_price - $amount), 2, '.', '');
+            
+            $params['items'][] = array(
+                'name' => $item['name'],
+                'price' => $item_price,
+                'quantity' => $item['qty'],
+            );
             
             $i++;
 		}
@@ -399,62 +413,178 @@ class WC_SC extends WC_Payment_Gateway
         $params['currency']         = get_woocommerce_currency();
         
         $for_hash = '';
-		foreach($params as $k=>$v){
-			$for_hash .= $v;
+		foreach($params as $k => $v) {
+            if(!is_array($v)) {
+                $for_hash .= $v;
+            }
 		}
         
-        $params['checksum'] = md5( stripslashes($this->secret . $for_hash));
+        # Cashier payment
+        if($this->payment_api == 'cashier') {
+            $params['checksum'] = hash($this->settigns['hash_type'], stripslashes($this->secret . $for_hash));
+            
+            $params_array = array();
+            foreach($params as $key => $value){
+                $params_array[] = "<input type='hidden' name='$key' value='$value'/>";
+            }
 
-        $params_array = array();
-        
-        echo '<pre>'.print_r($_POST,true).'</pre>';
-        
-        foreach($params as $key => $value){
-            $params_array[] = "<input type='hidden' name='$key' value='$value'/>";
-        }
-        
-        SC_API_Caller::create_log($params, 'Order params');
-        
-        $html =
-            '<form action="'.$this -> URL.'" method="post" id="sc_payment_form">'
-                .implode('', $params_array)
-                .'<noscript>'
-                    .'<input type="submit" class="button-alt" id="submit_sc_payment_form" value="'.__('Pay via '. SC_GATEWAY_TITLE, 'sc').'" /><a class="button cancel" href="'.$order->get_cancel_order_url().'">'.__('Cancel order &amp; restore cart', 'sc').'</a>'
-                .'</noscript>'
-                .'<script type="text/javascript">'
-                    .'jQuery(function(){';
-    
-        if(isset($this->show_thanks_msg) && $this->show_thanks_msg == 'yes') {
+            $this->create_log($params, 'Order params');
+
+            $html =
+                '<form action="'.$this -> URL.'" method="post" id="sc_payment_form">'
+                    .implode('', $params_array)
+                    .'<noscript>'
+                        .'<input type="submit" class="button-alt" id="submit_sc_payment_form" value="'.__('Pay via '. SC_GATEWAY_TITLE, 'sc').'" /><a class="button cancel" href="'.$order->get_cancel_order_url().'">'.__('Cancel order &amp; restore cart', 'sc').'</a>'
+                    .'</noscript>'
+                    .'<script type="text/javascript">'
+                        .'jQuery(function(){';
+
+            if(isset($this->show_thanks_msg) && $this->show_thanks_msg == 'yes') {
+                $html .=
+                            'jQuery("body").block({'
+                                .'message: \'<img src="'.$this->plugin_url.'icons/loading.gif" alt="Redirecting!" style="width:100px; float:left; margin-right: 10px;" />'.__('Thank you for your order. We are now redirecting you to '. SC_GATEWAY_TITLE .' Payment Gateway to make payment.', 'sc').'\','
+                                .'overlayCSS: {background: "#fff", opacity: 0.6},'
+                                .'css: {'
+                                    .'padding: 20,'
+                                    .'textAlign: "center",'
+                                    .'color: "#555",'
+                                    .'border: "3px solid #aaa",'
+                                    .'backgroundColor: "#fff",'
+                                    .'cursor: "wait",'
+                                    .'lineHeight: "32px"'
+                                .'}'
+                            .'});';
+            }
+
             $html .=
-                        'jQuery("body").block({'
-                            .'message: \'<img src="'.$this->plugin_url.'icons/loading.gif" alt="Redirecting!" style="width:100px; float:left; margin-right: 10px;" />'.__('Thank you for your order. We are now redirecting you to '. SC_GATEWAY_TITLE .' Payment Gateway to make payment.', 'sc').'\','
-                            .'overlayCSS: {background: "#fff", opacity: 0.6},'
-                            .'css: {'
-                                .'padding: 20,'
-                                .'textAlign: "center",'
-                                .'color: "#555",'
-                                .'border: "3px solid #aaa",'
-                                .'backgroundColor: "#fff",'
-                                .'cursor: "wait",'
-                                .'lineHeight: "32px"'
-                            .'}'
-                        .'});';
+                            'jQuery("#sc_payment_form").submit();'
+                        .'});'
+                    .'</script>'
+                .'</form>';
+
+            echo $html;
         }
         
-        $html .=
-                        '//jQuery("#sc_payment_form").submit();'
-                    .'});'
-                .'</script>'
-            .'</form>';
-        
-        echo $html;
+        # REST API payment
+        elseif($this->payment_api == 'rest') {
+            if(isset($this->show_thanks_msg) && $this->show_thanks_msg == 'yes') {
+                echo
+                    '<script type="text/javascript">'
+                        .'jQuery(function(){'
+                            .'jQuery("body").block({'
+                                .'message: \'<img src="'.$this->plugin_url.'icons/loading.gif" alt="Redirecting!" style="width:100px; float:left; margin-right: 10px;" />'.__('Thank you for your order. We are now redirecting you to '. SC_GATEWAY_TITLE .' Payment Gateway to make payment.', 'sc').'\','
+                                .'overlayCSS: {background: "#fff", opacity: 0.6},'
+                                .'css: {'
+                                    .'padding: 20,'
+                                    .'textAlign: "center",'
+                                    .'color: "#555",'
+                                    .'border: "3px solid #aaa",'
+                                    .'backgroundColor: "#fff",'
+                                    .'cursor: "wait",'
+                                    .'lineHeight: "32px"'
+                                .'}'
+                            .'});'
+                        .'});'
+                    .'</script>';
+            }
+            
+            $params['client_request_id'] = $TimeStamp .'_'. uniqid();
+                
+            $params['checksum'] = hash($this->settings['hash_type'], stripslashes(
+                $_SESSION['merchant_id']
+                .$_SESSION['merchantsite_id']
+                .$params['client_request_id']
+                .$params['total_amount']
+                .$params['currency']
+                .$TimeStamp
+                .$this->secret
+            ));
+            
+        //    echo '<h4>Session variables: </h4><pre>'.print_r($_SESSION['SC_Variables'], true).'</pre>';
+        //    echo '<h4>Payment parameters: </h4><pre>'.print_r($params, true).'</pre>';
+            
+            $this->create_log($_SESSION['SC_Variables'], 'SC_Variables: ');
+            $this->create_log($params, '$params REST: ');
+            
+            require_once 'SC_REST_API.php';
+            
+            $rest_api = new SC_REST_API();
+            $resp = $rest_api->process_payment($params);
+            
+            $this->create_log($resp, 'REST API response: ');
+            
+            if(!$resp) {
+                $order -> add_order_note('Payment API response is FALSE.');
+                $order->save();
+                
+                $this->create_log('', 'REST API Payment ERROR: ');
+                echo 
+                    '<script>'
+                        .'window.location.href = "'
+                            .$params['error_url'].'&ppp_status=failed&invoice_id='
+                            .$order_id.'&api=rest&reason=Payment API response is FALSE";'
+                    .'</script>';
+                exit;
+            }
+            
+            if($resp['status'] == 'ERROR') {
+                $order->add_order_note('Payment error: '.$resp['reason'].'.');
+                $order->save();
+                
+                $this->create_log($resp['errCode'].': '.$resp['reason'], 'REST API Payment ERROR: ');
+                echo 
+                    '<script>'
+                        .'window.location.href = "'
+                            .$params['error_url'].'&ppp_status=failed&invoice_id='
+                            .$order_id.'&api=rest&reason='.$resp['reason'].'";'
+                    .'</script>';
+                exit;
+            }
+            
+            if(isset($_SESSION['SC_Variables'])) {
+                unset($_SESSION['SC_Variables']);
+            }
+            
+            $order -> add_order_note('Payment succsess.');
+            $order->save();
+            
+            $this->create_log('', 'REST API Payment SUCCESS!');
+            echo 
+                '<script>'
+                    .'window.location.href = "'
+                        .$params['error_url'].'&ppp_status=success&invoice_id='
+                        .$order_id.'&api=rest";'
+                .'</script>';
+            
+            exit;
+        }
+        # ERROR - non existing payment api
+        else {
+            $this->create_log('the payment api is set to: '.$this->payment_api, 'Payment form ERROR: ');
+            echo '';
+            exit;
+        }
+            
     }
     
 	 /**
-     * Process the payment and return the result
+      * Function process_payment
+      * Process the payment and return the result. This is the place where site
+      * POST the form and then redirect. Here we will get our custom fields.
+      * 
+      * @param int $order_id
      **/
     function process_payment($order_id)
     {
+        // get AMP fields and add them to the session for future use
+        if(isset($_POST, $_POST['payment_method_sc']) && !empty($_POST['payment_method_sc'])) {
+            $_SESSION['SC_Variables']['APM_data']['payment_method'] = $_POST['payment_method_sc'];
+            
+            if(isset($_POST['apm_fields']) && !empty($_POST['apm_fields']) && is_array($_POST['apm_fields'])) {
+                $_SESSION['SC_Variables']['APM_data']['apm_fields'] = $_POST['apm_fields'];
+            }
+        }
+        
         $order = new WC_Order($order_id);
        
         return array(
@@ -577,34 +707,6 @@ class WC_SC extends WC_Payment_Gateway
         return '<div class="box '.$this -> msg['class'].'-box">'.$this -> msg['message'].'</div>'.$content;
     }
 
-     // get all pages
-    public function get_pages($title = false, $indent = true)
-    {
-        $wp_pages = get_pages('sort_column=menu_order');
-        $page_list = array();
-        
-        if ($title)
-            $page_list[] = $title;
-        
-        foreach ($wp_pages as $page) {
-            $prefix = '';
-            // show indented child pages?
-            if ($indent) {
-                $has_parent = $page->post_parent;
-                while($has_parent) {
-                    $prefix .=  ' - ';
-                    $next_page = get_page($has_parent);
-                    $has_parent = $next_page->post_parent;
-                }
-            }
-            
-            // add to page list array array
-            $page_list[$page->ID] = $prefix . $page->post_title;
-        }
-        
-        return $page_list;
-    }
-
 	public function checkAdvancedCheckSum()
     {
         if (isset($_GET['advanceResponseChecksum'])){
@@ -653,204 +755,6 @@ class WC_SC extends WC_Payment_Gateway
 		}
 	}
     
-    /**
-     * Function getAPMS
-     * Get and return APMS, depending of payment API.
-     * 
-     * @global object $woocommerce
-     * @return boolean|string
-     */
-    public function getAPMS()
-    {
-        $cl = new WC_Customer;
-		$this->setEnvironment();
-        
-        // for REST APMS
-        if($this->payment_api == 'rest') {
-            # getSessionToken
-            $time = date('YmdHis', time());
-            
-            $params = array(
-                'merchantId'        => $this->merchant_id,
-                'merchantSiteId'    => $this->merchantsite_id,
-                'clientRequestId'   => $time. '_' .uniqid(),
-                'timeStamp'         => $time,
-            );
-            
-            $resp_arr = SC_API_Caller::call_rest_api($this->use_session_token_url, $params, $this->secret, $this->hash_type);
-            
-            if(
-                !$resp_arr
-                || !is_array($resp_arr)
-                || !isset($resp_arr['status'])
-                || $resp_arr['status'] != 'SUCCESS'
-            ) {
-                SC_API_Caller::create_log($resp_arr, 'getting getSessionToken error: ');
-                return false;
-            }
-            # getSessionToken END
-            
-            # get merchant payment methods
-            $checksum_params = array(
-                'merchantId'        => $this->merchant_id,
-                'merchantSiteId'    => $this->merchantsite_id,
-                'clientRequestId'   => $time. '_' .uniqid(),
-                'timeStamp'         => $time,
-            );
-            
-            $other_params = array(
-                'sessionToken'      => $resp_arr['sessionToken'],
-                'currencyCode'      => get_woocommerce_currency(), // optional
-                'countryCode'       => (isset($_SESSION['sc_country']) && !empty($_SESSION['sc_country']))
-                    ? $_SESSION['sc_country'] : SC_Versions_Resolver::get_client_country($cl), // optional
-                'languageCode'      => $this->formatLocation(get_locale()), // optional
-                'type'              => '', // optional
-            );
-            
-            $resp_arr = SC_API_Caller::call_rest_api(
-                $this->use_merch_paym_meth_url,
-                $checksum_params,
-                $this->secret, $this->hash_type,
-                $other_params
-            );
-            
-            return $this->showRESTAPMs($resp_arr);
-            # get merchant payment methods END
-        }
-        
-        // for Cashier APMS
-        // for the moment we do not get APS with below method
-        return false;
-        
-		include_once ('nusoap/nusoap.php');
-		global $woocommerce;
-		
-		$client = new nusoap_client($this->useWSDL, true);
-        
-        SC_API_Caller::create_log($client, 'NuSoap Client data');
-        
-		$parameters = array(
-            "merchantId"        => $this->merchant_id,
-            "merchantSiteId"    => $this->merchantsite_id,
-            "amount"            => "1",
-            "languageCode"      => $this->formatLocation(get_locale()),
-            "gwMerchantName"    => "",
-            "gwPassword"        => "",
-            "currencyIsoCode"   => get_woocommerce_currency(),
-            "countryIsoCode"    => (isset($_SESSION['sc_country']) && !empty($_SESSION['sc_country']))
-                ? $_SESSION['sc_country'] : SC_Versions_Resolver::get_client_country($cl),
-        );
-        
-    //    SC_API_Caller::create_log($parameters, 'getAPMS params: ');
-    //    SC_API_Caller::create_log($_SESSION, '$_SESSION: ');
-		
-		if ($this->load_payment_options == 'yes') {
-			try{
-				$soap_response = $client->call('getMerchantSitePaymentOptions', $parameters);
-				return $this->showWSDLAPMs($soap_response);
-			}
-            catch(nusoap_fault $fault){
-                SC_API_Caller::create_log('error when try to get soap response');
-				return false;
-			}
-		}
-	}
-    
-    /**
-     * Function showRESTAPMs
-     * 
-     * In payment page shows SafeCharge sub-option and available payment methods.
-     * WSDL response structure is different than the REST API one.
-     * 
-     * @param array $apms
-     * @return string - html code
-     */
-    private function showRESTAPMs($apms)
-    {
-        SC_API_Caller::create_log('showRESTAPMs()', 'function: ');
-        if(!$apms || !is_array($apms) || !isset($apms) || count($apms['paymentMethods']) < 1) {
-            return '';
-        }
-        
-        $methods_fields = array();
-        $html = '<br />';
-        
-        foreach($apms['paymentMethods'] as $idx => $data) {
-            // add radio buttons for each payment method
-            $html .=
-                '<div style="paddin:10px 0px;">'
-                    .'<label>'
-                        .'<input id="payment_method_'.$data["paymentMethod"].'" type="radio" class="input-radio sc_payment_method_field" name="payment_method_sc" value="'.$data["paymentMethod"].'" required />&nbsp;&nbsp;'
-                        .utf8_encode($data['paymentMethodDisplayName'][0]['message']).' '
-                        .'<img src="'.$data['logoURL'].'" style="height:20px;" onerror="this.style.display=\'none\'">'
-                    .'</label>'
-                .'</div>'
-                .'<br/>';
-            
-            $methods_fields[$data["paymentMethod"]] = $data['fields'];
-        }
-        
-        // show and hide payment methods fields with JQ
-        $html .=
-            '<script>'
-                .'var paymentMethods = '.json_encode($methods_fields).';'
-            .'</script>'
-            .file_get_contents(dirname(__FILE__).'/views/apms_js.php')
-            .file_get_contents(dirname(__FILE__).'/views/apms_modal.php');
-        
-        return $html;
-    }
-    
-    /**
-     * Function showWSDLAPMs
-     * In payment page shows SafeCharge sub-option and available payment methods.
-     * WSDL response structure is different than the REST API one.
-     * 
-     * @param array $apms
-     * @return string - html code
-     */
-	private function showWSDLAPMs($apms)
-    {
-		$data='<br />';
-		
-        if(isset($apms["PaymentOptionsDetails"]["displayInfo"])) {
-			$logo = $this -> plugin_url.'icons/'.utf8_encode($apms["PaymentOptionsDetails"]["optionName"]).'.png';
-			$logo2 = $this->plugin_path.'icons/'.utf8_encode($apms["PaymentOptionsDetails"]["optionName"]).'.png';
-			
-            $data .=
-                '<input id="payment_method_'.$this->id.'_'.$apms["PaymentOptionsDetails"]["optionName"].'" type="radio" class="input-radio" name="payment_method_sc" value="'.$this->id.'_'.$apms["PaymentOptionsDetails"]["optionName"].'"  />'
-                .'<label for="payment_method_'.$this->id.'_'.$apms["PaymentOptionsDetails"]["optionName"].'">'
-                    .utf8_encode($apms["PaymentOptionsDetails"]["displayInfo"]["paymentOptionDisplayName"]).' ';
-			
-            if (file_exists($logo2)) {
-                $data .= '<img src="'.$this -> plugin_url.'icons/'.utf8_encode($apms["PaymentOptionsDetails"]["optionName"]).'.png" height="30px">';
-            }
-			
-            $data .= '</label>';
-		}
-        else if(isset($apms["PaymentOptionsDetails"])) {
-			foreach($apms["PaymentOptionsDetails"] as $apmDetails) {
-				$logo = $this -> plugin_url.'icons/'.utf8_encode($apmDetails["optionName"]).'.png';
-				$logo2 = $this->plugin_path.'icons/'.utf8_encode($apmDetails["optionName"]).'.png';
-				
-                $data .=
-                    '<div style="paddin:10px 0px;">'
-                        .'<input id="payment_method_'.$this->id.'_'.$apmDetails["optionName"].'" type="radio" class="input-radio" name="payment_method_sc" value="'.$this->id.'_'.$apmDetails["optionName"].'" />'
-                        .'<label for="payment_method_'.$this->id.'_'.$apmDetails["optionName"].'" >'
-                            .utf8_encode($apmDetails["displayInfo"]["paymentOptionDisplayName"]).' ';
-				
-                if (file_exists($logo2)) {
-                    $data .= '<img src="'.$logo.'" style="height:20px;">';
-                }
-				
-                $data .= '</label>'
-                    .'</div>';
-			}
-		}
-        
-		return $data;
-	}
-    
     private function formatLocation($locale)
     {
 		switch ($locale){
@@ -862,6 +766,58 @@ class WC_SC extends WC_Payment_Gateway
                 return 'en';
 		}
 	}
+    
+    /**
+     * Function create_log
+     * Create logs. You MUST have defined SC_LOG_FILE_PATH const,
+     * holding the full path to the log file.
+     * 
+     * @param mixed $data
+     * @param string $title - title of the printed log
+     */
+    private function create_log($data, $file, $title = '')
+    {
+        if(!defined('WP_DEBUG') || WP_DEBUG === false) {
+            return;
+        }
+        
+        $d = '';
+        
+        if(is_array($data) || is_object($data)) {
+            $d = print_r($data, true);
+        //    $d = mb_convert_encoding($d, 'UTF-8');
+            $d = '<pre>'.$d.'</pre>';
+        }
+        elseif(is_string($data)) {
+        //    $d = mb_convert_encoding($data, 'UTF-8');
+            $d = '<pre>'.$d.'</pre>';
+        }
+        elseif(is_bool($data)) {
+            $d = $data ? 'true' : 'false';
+            $d = '<pre>'.$d.'</pre>';
+        }
+        else {
+            $d = '<pre>'.$data.'</pre>';
+        }
+        
+        if(!empty($title)) {
+            $d = '<h3>'.$title.'</h3>'."\r\n".$d;
+        }
+        
+        try {
+            if(defined('SC_LOG_FILE_PATH')) {
+                file_put_contents(SC_LOG_FILE_PATH, date('H:i:s') . ': ' . $d."\r\n"."\r\n", FILE_APPEND);
+            }
+        }
+        catch (Exception $exc) {
+            echo
+                '<script>'
+                    .'error.log("Log file was not created, by reason: '.$exc.'");'
+                    .'console.log("Log file was not created, by reason: '.$data.'");'
+                .'</script>';
+        }
+
+    }
 }
 
 ?>

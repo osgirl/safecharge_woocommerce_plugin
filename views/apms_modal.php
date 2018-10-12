@@ -3,15 +3,15 @@
     <div class="modal-dialog">
         <div class="modal-content">
             <div class="modal-header">
-                <button class="close close_apms_modal_btn" type="button" data-dismiss="modal">×</button>
+                <button class="close close_apms_modal_btn" type="button" onclick="closeACAPMsModal()">×</button>
                 <h4 class="modal-title">Fill required fields</h4>
             </div>
             
             <div class="modal-body"></div>
             
             <div class="modal-footer">
-                <button class="btn btn-default close_apms_modal_btn" type="button" data-dismiss="modal">Close</button>
-                <button class="btn btn-primary" type="button" onclick="validateScAPMsModal()">Submit</button>
+                <button class="btn btn-default close_apms_modal_btn" type="button" onclick="closeACAPMsModal()">Close</button>
+                <button class="btn btn-primary" type="button" onclick="scValidateAPMsModal()">Continue</button>
             </div>
         </div><!-- /.modal-content -->
     </div><!-- /.modal-dialog -->

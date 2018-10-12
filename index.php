@@ -33,12 +33,11 @@ function woocommerce_sc_init()
     // try to catch ajax
     add_action( 'wp_ajax_my_action', 'my_action' );
     add_action( 'wp_ajax_nopriv_my_action', 'my_action' );
-}
-
-function my_action()
-{
-    echo 'my_action()';
-    exit;
+    
+    // Check checkout for selected apm ONLY when payment api is REST
+    if(isset($_SESSION['SC_Variables']['payment_api']) && $_SESSION['SC_Variables']['payment_api'] == 'rest') {
+        add_action( 'woocommerce_checkout_process', 'sc_check_checkout_apm', 20 ) ;
+    }
 }
 
 /**
@@ -50,7 +49,7 @@ function woocommerce_add_sc_gateway($methods)
     return $methods;
 }
 
-// we come here after DMN redirect
+// first method we come in
 function sc_enqueue($hook)
 {
     // when we get DMN from Cashier
@@ -94,25 +93,15 @@ function sc_enqueue($hook)
     
     // TODO when we get DMN from REST API about the refund save Order Note
     
-    
-//    include_once("token.php");
-    
-//    $timestamp= time();
-//    $g = new WC_SC;
-//    $g->setEnvironment();
-//    
+    // load external files
     $plugin_dir = basename(dirname(__FILE__));
-//    
+   
     wp_register_script("sc_js_script", WP_PLUGIN_URL . '/' . $plugin_dir . '/js/sc.js', array('jquery') );
     wp_localize_script(
         'sc_js_script',
         'myAjax',
         array(
-        //    'ajaxurl' => WP_PLUGIN_URL . '/' . $plugin_dir .'/ajax/getAPMs.php',
-            'ajaxurl' => WP_PLUGIN_URL . '/' . $plugin_dir .'/SC_APMs_Getter.php',
-        //    'token' =>generateToken($timestamp),
-        //    't'=>$timestamp
-            
+            'ajaxurl' => WP_PLUGIN_URL . '/' . $plugin_dir .'/SC_REST_API.php',
         )
     );  
     wp_enqueue_script( 'jquery' );
@@ -120,12 +109,14 @@ function sc_enqueue($hook)
     
     // bootstrap modal
     wp_register_script ('sc_bs_modal', WP_PLUGIN_URL. '/'. $plugin_dir. '/js/bootstrap.min.js', array( 'jquery' ), '1', true );
-    wp_register_style ('sc_bs_modal',  WP_PLUGIN_URL. '/'. $plugin_dir. '/css/sc_bs_modal.css', '' , '', 'all' );
+    wp_register_style ('sc_bs_modal_style',  WP_PLUGIN_URL. '/'. $plugin_dir. '/css/sc_bs_modal.css', '' , '', 'all' );
     
     wp_enqueue_script( 'sc_bs_modal' );
-	wp_enqueue_style( 'sc_bs_modal' );
+	wp_enqueue_style( 'sc_bs_modal_style' );
+    // load external files END
 }
 
+// show final payment text, when use REST API we change order status here
 function sc_show_final_text()
 {
     global $woocommerce;
@@ -134,30 +125,49 @@ function sc_show_final_text()
     $arr = explode("_",$_REQUEST['invoice_id']);
     $order_id  = $arr[0];
     $order = new WC_Order($order_id);
+    $order_status = strtolower($order->get_status());
+    
+    $msg = __("Thank you. Your payment process is completed. Your order status will be updated soon.", 'sc');
+    
+    if ( strtolower($_REQUEST['ppp_status']) == 'failed' ) {
+        $order -> add_order_note('User order failed.');
+        if(@$_REQUEST['api'] == 'rest' && $order_status == 'pending') {
+            $order->set_status('failed');
+        }
         
-    if ( strtolower($_REQUEST['ppp_status']) == 'fail' ) {
-        $order -> add_order_note('User order faild.');
-        $order->save();
-            
-        $woocommerce -> cart -> empty_cart();
-        echo __("Your payment failed. Please, try again.", 'sc');
+        $msg = __("Your payment failed. Please, try again.", 'sc');
+    }
+    // we came here from REST API
+    elseif(@$_REQUEST['api'] == 'rest' && @$_REQUEST['ppp_status'] == 'success') {
+        if($order_status == 'pending') {
+            $order->set_status('completed');
+        }
     }
     elseif ($g->checkAdvancedCheckSum()) {
         $transactionId = "TransactionId = " . (isset($_GET['TransactionID']) ? $_GET['TransactionID'] : "");
         $pppTransactionId = "; PPPTransactionId = " . (isset($_GET['PPP_TransactionID']) ? $_GET['PPP_TransactionID'] : "");
         
         $order->add_order_note("User returned from Safecharge Payment page; ". $transactionId. $pppTransactionId);
-        $order->save();
-        
-        $woocommerce -> cart -> empty_cart();
-        echo __("Thank you. Your payment process is completed. Your order status will be updated soon.", 'sc');
     }
+    
+    $order->save();
+    $woocommerce -> cart -> empty_cart();
+    echo $msg;
 }
 
 function sc_create_refund()
 {
-    require_once 'WC_SC_Refund.php';
+    require_once 'SC_REST_API.php';
     
-    $refund = new WC_SC_Refund();
-    $refund->sc_refund_order();
+    $sc_api = new SC_REST_API();
+    $sc_api->sc_refund_order();
+}
+
+function sc_check_checkout_apm()
+{
+    // if custom fields are empty stop checkout process displaying an error notice.
+    if ( empty($_POST['payment_method_sc']) ) {
+        $notice = __( 'Please select '. SC_GATEWAY_TITLE .' payment method to continue!', 'sc' );
+        wc_add_notice( '<strong>' . $notice . '</strong>', 'error' );
+    }
 }

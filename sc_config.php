@@ -7,7 +7,15 @@
 define('SC_GATEWAY_TITLE', 'SafeCharge');
 
 // common notify URL for the plugin
-define('SC_NOTIFY_URL', $_SERVER['HTTP_HOST'] . '/?wc-api=WC_Gateway_SC');
+ if(
+    (isset($_SERVER["HTTPS"]) && !empty($_SERVER["HTTPS"]) && strtolower ($_SERVER['HTTPS']) != 'off')
+    || (isset($_SERVER["SERVER_PROTOCOL"]) && strpos($_SERVER["SERVER_PROTOCOL"], 'HTTPS/') == 0)
+) {
+     define('SC_NOTIFY_URL', 'https://'. $_SERVER['HTTP_HOST'] . '/?wc-api=WC_Gateway_SC');
+}
+elseif(isset($_SERVER["SERVER_PROTOCOL"]) && strpos($_SERVER["SERVER_PROTOCOL"], 'HTTP/') == 0) {
+    define('SC_NOTIFY_URL', 'http://'. $_SERVER['HTTP_HOST'] . '/?wc-api=WC_Gateway_SC');
+ }
 
 // some keys for order metadata, we make them hiden when starts with underscore
 define('SC_AUTH_CODE_KEY', '_authCode');
