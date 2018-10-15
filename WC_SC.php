@@ -237,6 +237,7 @@ class WC_SC extends WC_Payment_Gateway
         
 		$TimeStamp = date('Ymdhis');
         $order = new WC_Order($order_id);
+        $order_status = strtolower($order->get_status());
         
         $cust_fields = $order->get_meta_data();
         $cust_fields2 = get_post_meta($order_id, 'payment_method_sc', true);
@@ -512,50 +513,66 @@ class WC_SC extends WC_Payment_Gateway
             $resp = $rest_api->process_payment($params);
             
             $this->create_log($resp, 'REST API response: ');
+            $order_status = strtolower($order->get_status());
             
             if(!$resp) {
+                if($order_status == 'pending') {
+                    $order->set_status('failed');
+                }
+                
                 $order -> add_order_note('Payment API response is FALSE.');
                 $order->save();
                 
                 $this->create_log('', 'REST API Payment ERROR: ');
                 echo 
                     '<script>'
-                        .'window.location.href = "'
-                            .$params['error_url'].'&ppp_status=failed&invoice_id='
-                            .$order_id.'&api=rest&reason=Payment API response is FALSE";'
+                        .'window.location.href = "'.$params['error_url']
+                        .'&api=rest&status=faild";'
                     .'</script>';
                 exit;
             }
             
             if($resp['status'] == 'ERROR') {
+                if($order_status == 'pending') {
+                    $order->set_status('failed');
+                }
+                
                 $order->add_order_note('Payment error: '.$resp['reason'].'.');
                 $order->save();
                 
                 $this->create_log($resp['errCode'].': '.$resp['reason'], 'REST API Payment ERROR: ');
                 echo 
                     '<script>'
-                        .'window.location.href = "'
-                            .$params['error_url'].'&ppp_status=failed&invoice_id='
-                            .$order_id.'&api=rest&reason='.$resp['reason'].'";'
+                        .'window.location.href = "'.$params['error_url']
+                            .'&api=rest&status=faild";'
                     .'</script>';
                 exit;
             }
             
-            if(isset($_SESSION['SC_Variables'])) {
-                unset($_SESSION['SC_Variables']);
+            if($order_status == 'pending') {
+                $order->set_status('completed');
             }
             
-            $order -> add_order_note('Payment succsess.');
+            if(@$resp['transactionId']) {
+                $order -> add_order_note(__('Payment succsess for Transaction Id ', 'sc') . $resp['transactionId']);
+            }
+            else {
+                $order -> add_order_note(__('Payment succsess.'));
+            }
             $order->save();
             
             // send order email manually
         //    WC()->mailer()->emails['WC_Email_Customer_Processing_Order']->trigger($order_id);
             
+            // clear session variables for the order
+            if(isset($_SESSION['SC_Variables'])) {
+                unset($_SESSION['SC_Variables']);
+            }
+            
             echo 
                 '<script>'
                     .'window.location.href = "'
-                        .$params['error_url'].'&ppp_status=success&invoice_id='
-                        .$order_id.'&api=rest";'
+                        .$params['error_url'].'&status=success&api=rest";'
                 .'</script>';
             
             exit;

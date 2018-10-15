@@ -120,38 +120,39 @@ function sc_enqueue($hook)
 function sc_show_final_text()
 {
     global $woocommerce;
-    $g = new WC_SC;
-    
-    $arr = explode("_",$_REQUEST['invoice_id']);
-    $order_id  = $arr[0];
-    $order = new WC_Order($order_id);
-    $order_status = strtolower($order->get_status());
-    
     $msg = __("Thank you. Your payment process is completed. Your order status will be updated soon.", 'sc');
     
-    if ( strtolower($_REQUEST['ppp_status']) == 'failed' ) {
-        $order -> add_order_note('User order failed.');
-        if(@$_REQUEST['api'] == 'rest' && $order_status == 'pending') {
-            $order->set_status('failed');
+    // REST API
+    if(@$_REQUEST['api'] == 'rest') {
+        if ( strtolower($_REQUEST['status']) == 'failed' ) {
+            $msg = __("Your payment failed. Please, try again.", 'sc');
         }
-        
-        $msg = __("Your payment failed. Please, try again.", 'sc');
-    }
-    // we came here from REST API
-    elseif(@$_REQUEST['api'] == 'rest' && @$_REQUEST['ppp_status'] == 'success') {
-        if($order_status == 'pending') {
-            $order->set_status('completed');
+        elseif(strtolower($_REQUEST['status']) == 'success') {
+            $woocommerce -> cart -> empty_cart();
         }
     }
-    elseif ($g->checkAdvancedCheckSum()) {
-        $transactionId = "TransactionId = " . (isset($_GET['TransactionID']) ? $_GET['TransactionID'] : "");
-        $pppTransactionId = "; PPPTransactionId = " . (isset($_GET['PPP_TransactionID']) ? $_GET['PPP_TransactionID'] : "");
+    // Cashier
+    else {
+        $g = new WC_SC;
+        $arr = explode("_",$_REQUEST['invoice_id']);
+        $order_id  = $arr[0];
+        $order = new WC_Order($order_id);
         
-        $order->add_order_note("User returned from Safecharge Payment page; ". $transactionId. $pppTransactionId);
+        if ( strtolower($_REQUEST['ppp_status']) == 'failed' ) {
+            $order -> add_order_note('User order failed.');
+            $msg = __("Your payment failed. Please, try again.", 'sc');
+        }
+        elseif ($g->checkAdvancedCheckSum()) {
+            $transactionId = "TransactionId = " . (isset($_GET['TransactionID']) ? $_GET['TransactionID'] : "");
+            $pppTransactionId = "; PPPTransactionId = " . (isset($_GET['PPP_TransactionID']) ? $_GET['PPP_TransactionID'] : "");
+
+            $order->add_order_note("User returned from Safecharge Payment page; ". $transactionId. $pppTransactionId);
+            $woocommerce -> cart -> empty_cart();
+        }
+        
+        $order->save();
     }
     
-    $order->save();
-    $woocommerce -> cart -> empty_cart();
     echo $msg;
 }
 
