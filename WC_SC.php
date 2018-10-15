@@ -520,7 +520,7 @@ class WC_SC extends WC_Payment_Gateway
                     $order->set_status('failed');
                 }
                 
-                $order -> add_order_note('Payment API response is FALSE.');
+                $order -> add_order_note(__('Payment API response is FALSE.', 'sc'));
                 $order->save();
                 
                 $this->create_log('', 'REST API Payment ERROR: ');
@@ -537,6 +537,10 @@ class WC_SC extends WC_Payment_Gateway
                     $order->set_status('failed');
                 }
                 
+                if(isset($resp['transactionId'])) {
+                    $order->update_meta_data(SC_GW_TRANS_ID_KEY, $resp['transactionId'], 0);
+                }
+                
                 $order->add_order_note('Payment error: '.$resp['reason'].'.');
                 $order->save();
                 
@@ -551,6 +555,10 @@ class WC_SC extends WC_Payment_Gateway
             
             if($order_status == 'pending') {
                 $order->set_status('completed');
+            }
+            
+            if(isset($resp['transactionId'])) {
+                $order->update_meta_data(SC_GW_TRANS_ID_KEY, $resp['transactionId'], 0);
             }
             
             if(@$resp['transactionId']) {
@@ -799,7 +807,7 @@ class WC_SC extends WC_Payment_Gateway
      * @param mixed $data
      * @param string $title - title of the printed log
      */
-    private function create_log($data, $file, $title = '')
+    private function create_log($data, $title = '')
     {
         if(!defined('WP_DEBUG') || WP_DEBUG === false) {
             return;

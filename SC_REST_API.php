@@ -56,12 +56,21 @@ class SC_REST_API
             $this->use_cpanel_url = $this->user_live_cpanel_url;
         }
         
-        $request = $_REQUEST;
         $order = new WC_Order( (int)$_REQUEST['order_id'] );
         $refunds = $order->get_refunds();
         
         $time = date('YmdHis', time());
-        $ord_tr_id = $order->get_transaction_id();
+        $ord_tr_id = $order->get_meta(SC_GW_TRANS_ID_KEY);
+        
+        // at the moment with the REST API we do not recieve transaction ID,
+        // and we get empty string bleow
+        if(!$ord_tr_id || empty($ord_tr_id)) {
+            $note = __('The Order does not have Transaction ID. Refund can not procceed.');
+            $order -> add_order_note(__($note, 'sc'));
+            $order->save();
+            
+            wp_send_json_success();
+        }
         
         $ref_parameters = array(
             'merchantId'            => $this->settings['merchant_id'],
@@ -70,7 +79,7 @@ class SC_REST_API
             'clientUniqueId'        => $ord_tr_id,
             'amount'                => number_format($refunds[0]->data['amount'], 2),
             'currency'              => get_woocommerce_currency(),
-            'relatedTransactionId'  => $order->get_meta(SC_GW_TRANS_ID_KEY), // GW Transaction ID
+            'relatedTransactionId'  => $ord_tr_id, // GW Transaction ID
             'authCode'              => $order->get_meta(SC_AUTH_CODE_KEY),
             'comment'               => $refunds[0]->data['reason'], // optional
             'url'                   => SC_NOTIFY_URL,
@@ -80,6 +89,9 @@ class SC_REST_API
         $other_params = array(
             'urlDetails'            => array('notificationUrl' => SC_NOTIFY_URL),
         );
+        
+        $this->create_log($ref_parameters, 'refund_parameters: ');
+        $this->create_log($other_params, 'other_params: ');
         
         $json_arr = $this->call_rest_api(
             $this->use_refund_url,
@@ -92,7 +104,7 @@ class SC_REST_API
         $note = '';
         $error_note = 'Please check your e-mail for details and manually delete request Refund #'
             .$refunds[0]->id.' form the order or login into '. $this->use_cpanel_url
-            .' and refund Transaction ID '.$order->get_meta(SC_GW_TRANS_ID_KEY);
+            .' and refund Transaction ID '.$ord_tr_id;
         
         if($json_arr === false){
             $note = __('The REST API retun false. '.$error_note, 'sc');
@@ -114,7 +126,7 @@ class SC_REST_API
             wp_send_json_success();
         }
         
-        $this->create_log($json_arr, '$json_arr: ');
+        $this->create_log($json_arr, 'json_arr: ');
         
         // the status of the request
         if(isset($json_arr['status']) && $json_arr['status'] == 'ERROR') {
@@ -399,7 +411,7 @@ class SC_REST_API
      * @param mixed $data
      * @param string $title - title of the printed log
      */
-    private function create_log($data, $file, $title = '')
+    private function create_log($data, $title = '')
     {
         if(!defined('WP_DEBUG') || WP_DEBUG === false) {
             return;
