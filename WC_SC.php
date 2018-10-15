@@ -504,7 +504,7 @@ class WC_SC extends WC_Payment_Gateway
         //    echo '<h4>Payment parameters: </h4><pre>'.print_r($params, true).'</pre>';
             
             $this->create_log($_SESSION['SC_Variables'], 'SC_Variables: ');
-            $this->create_log($params, '$params REST: ');
+            $this->create_log($params, 'params sent to REST: ');
             
             require_once 'SC_REST_API.php';
             
@@ -548,7 +548,9 @@ class WC_SC extends WC_Payment_Gateway
             $order -> add_order_note('Payment succsess.');
             $order->save();
             
-            $this->create_log('', 'REST API Payment SUCCESS!');
+            // send order email manually
+        //    WC()->mailer()->emails['WC_Email_Customer_Processing_Order']->trigger($order_id);
+            
             echo 
                 '<script>'
                     .'window.location.href = "'
@@ -558,10 +560,15 @@ class WC_SC extends WC_Payment_Gateway
             
             exit;
         }
-        # ERROR - non existing payment api
+        # ERROR - not existing payment api
         else {
             $this->create_log('the payment api is set to: '.$this->payment_api, 'Payment form ERROR: ');
-            echo '';
+            echo 
+                '<script>'
+                    .'window.location.href = "'
+                        .$params['error_url'].'&ppp_status=failed&invoice_id='
+                        .$order_id.'&api=rest&reason=not existing payment API'
+                .'</script>';
             exit;
         }
             
