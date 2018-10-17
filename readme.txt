@@ -42,8 +42,11 @@ Please, contact out Tech-Support team (tech-support@safecharge.com) in case of q
 
 == Changelog ==
 
+= 1.3.1 - 2018-10-17 =
+* Add - Add SC theme for the APM fields.
+
 = 1.3 - 2018-10-02 =
-* Add - Started work on REST API integration for payments.
+* Add - Work with REST API payments integration.
 
 = 1.2 - 2018-09-27 =
 * Add - Support for Refund.
