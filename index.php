@@ -52,47 +52,6 @@ function woocommerce_add_sc_gateway($methods)
 // first method we come in
 function sc_enqueue($hook)
 {
-    // when we get DMN from Cashier
-    if(
-        isset($_REQUEST['Status'], $_REQUEST['wc-api'])
-        && $_REQUEST['wc-api'] == 'WC_Gateway_SC'
-        && !empty($_REQUEST['Status'])
-    ) {
-        $arr = explode("_", $_REQUEST['invoice_id']);
-        $order_id  = $arr[0];
-        $order = new WC_Order($order_id);
-        $order_status = strtolower($order->get_status());
-        
-        /*  Skip order status update if currentlly received status is 'pending' and curent order status is 'completed'.
-        * For the rest of the cases the status should be updated.   */
-        if (
-            strtolower($_REQUEST['Status']) == 'pending'
-            && $order_status != 'completed'
-        ) {
-            $order->set_status($_REQUEST['Status']);
-        }
-        
-        // save or update AuthCode and GW Transaction ID
-        $auth_code = isset($_REQUEST['AuthCode']) ? $_REQUEST['AuthCode'] : '';
-        $saved_ac = $order->get_meta(SC_AUTH_CODE_KEY);
-        
-        if(!$saved_ac || empty($saved_ac) || $saved_ac !== $auth_code) {
-            $resp = $order->update_meta_data(SC_AUTH_CODE_KEY, $auth_code);
-        }
-        
-        $gw_transaction_id = isset($_REQUEST['TransactionID']) ? $_REQUEST['TransactionID'] : '';
-        $saved_tr_id = $order->get_meta(SC_GW_TRANS_ID_KEY);
-        
-        if(!$saved_tr_id || empty($saved_tr_id) || $saved_tr_id !== $gw_transaction_id) {
-            $order->update_meta_data(SC_GW_TRANS_ID_KEY, $gw_transaction_id, 0);
-        }
-        
-        $order->save();
-        // save or update AuthCode and GW Transaction ID END
-    }
-    
-    // TODO when we get DMN from REST API about the refund save Order Note
-    
     // load external files
     $plugin_dir = basename(dirname(__FILE__));
    
@@ -123,16 +82,19 @@ function sc_show_final_text()
     $msg = __("Thank you. Your payment process is completed. Your order status will be updated soon.", 'sc');
     
     // REST API
-    if(@$_REQUEST['api'] == 'rest') {
+    if(isset($_REQUEST['wc-api']) && strtolower($_REQUEST['wc-api']) == 'wc_sc_rest') {
         if ( strtolower($_REQUEST['status']) == 'failed' ) {
             $msg = __("Your payment failed. Please, try again.", 'sc');
         }
         elseif(strtolower($_REQUEST['status']) == 'success') {
             $woocommerce -> cart -> empty_cart();
         }
+        else {
+            $woocommerce -> cart -> empty_cart();
+        }
     }
     // Cashier
-    else {
+    elseif(@$_REQUEST['invoice_id'] && @$_REQUEST['ppp_status']) {
         $g = new WC_SC;
         $arr = explode("_",$_REQUEST['invoice_id']);
         $order_id  = $arr[0];
@@ -151,6 +113,23 @@ function sc_show_final_text()
         }
         
         $order->save();
+    }
+    else {
+        $woocommerce -> cart -> empty_cart();
+        
+        if ( strtolower(@$_REQUEST['status']) == 'failed' ) {
+            $msg = __("Your payment failed. Please, try again.", 'sc');
+        }
+    }
+    
+    if(strtolower(@$_REQUEST['status']) == 'waiting') {
+        $msg = __("Thank you. If you completed your payment, the order status will be updated soon", 'sc');
+        $woocommerce -> cart -> empty_cart();
+    }
+    
+    // clear session variables for the order
+    if(isset($_SESSION['SC_Variables'])) {
+        unset($_SESSION['SC_Variables']);
     }
     
     echo $msg;
@@ -172,3 +151,55 @@ function sc_check_checkout_apm()
         wc_add_notice( '<strong>' . $notice . '</strong>', 'error' );
     }
 }
+
+/**
+     * Function create_log
+     * Create logs. You MUST have defined SC_LOG_FILE_PATH const,
+     * holding the full path to the log file.
+     * 
+     * @param mixed $data
+     * @param string $title - title of the printed log
+     */
+    function create_log($data, $title = '')
+    {
+        if(!defined('WP_DEBUG') || WP_DEBUG === false) {
+            return;
+        }
+        
+        $d = '';
+        
+        if(is_array($data) || is_object($data)) {
+            $d = print_r($data, true);
+        //    $d = mb_convert_encoding($d, 'UTF-8');
+            $d = '<pre>'.$d.'</pre>';
+        }
+        elseif(is_string($data)) {
+        //    $d = mb_convert_encoding($data, 'UTF-8');
+            $d = '<pre>'.$d.'</pre>';
+        }
+        elseif(is_bool($data)) {
+            $d = $data ? 'true' : 'false';
+            $d = '<pre>'.$d.'</pre>';
+        }
+        else {
+            $d = '<pre>'.$data.'</pre>';
+        }
+        
+        if(!empty($title)) {
+            $d = '<h3>'.$title.'</h3>'."\r\n".$d;
+        }
+        
+        try {
+            if(defined('SC_LOG_FILE_PATH')) {
+                file_put_contents(SC_LOG_FILE_PATH, date('H:i:s') . ': ' . $d."\r\n"."\r\n", FILE_APPEND);
+            }
+        }
+        catch (Exception $exc) {
+            echo
+                '<script>'
+                    .'error.log("Log file was not created, by reason: '.$exc.'");'
+                    .'console.log("Log file was not created, by reason: '.$data.'");'
+                .'</script>';
+        }
+
+    }

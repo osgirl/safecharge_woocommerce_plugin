@@ -98,6 +98,7 @@ class WC_SC extends WC_Payment_Gateway
 		add_action('woocommerce_checkout_process', array($this, 'sc_checkout_process'));
 		add_action('woocommerce_receipt_'.$this -> id, array($this, 'receipt_page'));
 		add_action('woocommerce_api_wc_gateway_sc', array($this, 'process_sc_notification'));
+		add_action('woocommerce_api_wc_sc_rest', array($this, 'process_sc_notification'));
 	}
 
     /**
@@ -174,7 +175,7 @@ class WC_SC extends WC_Payment_Gateway
             'show_thanks_msg' => array(
                 'title' => __('Show "Loading message"', 'sc'),
                 'type' => 'checkbox',
-                'label' => __('Show "Loading message" when redirect to secure cashier', 'sc'),
+                'label' => __('Show "Loading message" when redirect to secure Cashier. Does not work on the REST API.', 'sc'),
                 'default' => 'no'
             ),
 //            'load_payment_options' => array(
@@ -244,7 +245,7 @@ class WC_SC extends WC_Payment_Gateway
         
         $this->create_log($order, "the order data: ");
         
-        $order->add_order_note("User is redicted to Safecharge Payment page");
+        $order->add_order_note("User is redicted to ".SC_GATEWAY_TITLE." Payment page.");
         $order->save();
         
 		$items = $order->get_items();
@@ -280,7 +281,7 @@ class WC_SC extends WC_Payment_Gateway
             ) {
                 $prod_img_path = str_replace($params['site_url'], '', $prod_img_data[0]);
             }
-            $params['item_image_'.$i] = $prod_img_path;
+        //    $params['item_image_'.$i] = $prod_img_path;
             // set product img url END
 			
             // Use this ONLY when the merchant is not using open amount and when there is an items table on their theme.
@@ -329,7 +330,7 @@ class WC_SC extends WC_Payment_Gateway
 		$params['pending_url']          = $this->get_return_url();
 		$params['error_url']            = $this->get_return_url();
 		$params['back_url']             = $payment_page;
-		$params['notify_url']           = SC_NOTIFY_URL;
+		$params['notify_url']           = SC_NOTIFY_URL . 'WC_Gateway_SC';
 		$params['invoice_id']           = $order_id.'_'.$TimeStamp;
 		$params['merchant_unique_id']   = $order_id.'_'.$TimeStamp;
         
@@ -353,8 +354,8 @@ class WC_SC extends WC_Payment_Gateway
 		$params['phone1'] =
             urlencode(preg_replace("/[[:punct:]]/", '', SC_Versions_Resolver::get_order_data($order, 'billing_phone')));
 		
-        $params['email']                = SC_Versions_Resolver::get_order_data($order, 'billing_email');
-        $params['user_token_id']        = SC_Versions_Resolver::get_order_data($order, 'billing_email');
+        $params['email']            = SC_Versions_Resolver::get_order_data($order, 'billing_email');
+        $params['user_token_id']    = SC_Versions_Resolver::get_order_data($order, 'billing_email');
         // get and pass to cashier billing data END
         
         // get and pass to cashier hipping data
@@ -468,28 +469,14 @@ class WC_SC extends WC_Payment_Gateway
         
         # REST API payment
         elseif($this->payment_api == 'rest') {
-            if(isset($this->show_thanks_msg) && $this->show_thanks_msg == 'yes') {
-                echo
-                    '<script type="text/javascript">'
-                        .'jQuery(function(){'
-                            .'jQuery("body").block({'
-                                .'message: \'<img src="'.$this->plugin_url.'icons/loading.gif" alt="Redirecting!" style="width:100px; float:left; margin-right: 10px;" />'.__('Thank you for your order. We are now redirecting you to '. SC_GATEWAY_TITLE .' Payment Gateway to make payment.', 'sc').'\','
-                                .'overlayCSS: {background: "#fff", opacity: 0.6},'
-                                .'css: {'
-                                    .'padding: 20,'
-                                    .'textAlign: "center",'
-                                    .'color: "#555",'
-                                    .'border: "3px solid #aaa",'
-                                    .'backgroundColor: "#fff",'
-                                    .'cursor: "wait",'
-                                    .'lineHeight: "32px"'
-                                .'}'
-                            .'});'
-                        .'});'
-                    .'</script>';
-            }
-            
             $params['client_request_id'] = $TimeStamp .'_'. uniqid();
+            
+            $params['urlDetails'] = array(
+                'successUrl'        => $this->get_return_url(),
+                'failureUrl'        => $this->get_return_url(),
+                'pendingUrl'        => $this->get_return_url(),
+                'notificationUrl'   => SC_NOTIFY_URL . 'WC_SC_Rest'
+            );
                 
             $params['checksum'] = hash($this->settings['hash_type'], stripslashes(
                 $_SESSION['merchant_id']
@@ -510,6 +497,7 @@ class WC_SC extends WC_Payment_Gateway
             require_once 'SC_REST_API.php';
             
             $rest_api = new SC_REST_API();
+            // ALWAYS CHECK USED PARAMS IN process_payment
             $resp = $rest_api->process_payment($params);
             
             $this->create_log($resp, 'REST API response: ');
@@ -523,11 +511,11 @@ class WC_SC extends WC_Payment_Gateway
                 $order -> add_order_note(__('Payment API response is FALSE.', 'sc'));
                 $order->save();
                 
-                $this->create_log('', 'REST API Payment ERROR: ');
+                $this->create_log($resp, 'REST API Payment ERROR: ');
+                
                 echo 
                     '<script>'
-                        .'window.location.href = "'.$params['error_url']
-                        .'&api=rest&status=faild";'
+                        .'window.location.href = "'.$params['error_url'].'&status=failed";'
                     .'</script>';
                 exit;
             }
@@ -545,11 +533,27 @@ class WC_SC extends WC_Payment_Gateway
                 $order->save();
                 
                 $this->create_log($resp['errCode'].': '.$resp['reason'], 'REST API Payment ERROR: ');
+                
                 echo 
                     '<script>'
-                        .'window.location.href = "'.$params['error_url']
-                            .'&api=rest&status=faild";'
+                        .'window.location.href = "'.$params['error_url'].'&status=failed";'
                     .'</script>';
+                exit;
+            }
+            
+            // pay with redirect URL
+            if(
+                $resp['status'] == 'SUCCESS'
+                && isset($resp['redirectURL'])
+                && !empty($resp['redirectURL'])
+            ) {
+                echo 
+                    '<script>'
+                        .'var newTab = window.open("'.$resp['redirectURL'].'", "_blank");'
+                        .'newTab.focus();'
+                        .'window.location.href = "'.$params['error_url'].'&status=waiting";'
+                    .'</script>';
+                
                 exit;
             }
             
@@ -557,12 +561,10 @@ class WC_SC extends WC_Payment_Gateway
                 $order->set_status('completed');
             }
             
-            if(isset($resp['transactionId'])) {
-                $order->update_meta_data(SC_GW_TRANS_ID_KEY, $resp['transactionId'], 0);
-            }
-            
+            // If we get Transaction ID save it as meta-data
             if(@$resp['transactionId']) {
-                $order -> add_order_note(__('Payment succsess for Transaction Id ', 'sc') . $resp['transactionId']);
+                $order->update_meta_data(SC_GW_TRANS_ID_KEY, $resp['transactionId'], 0);
+                $order->add_order_note(__('Payment succsess for Transaction Id ', 'sc') . $resp['transactionId']);
             }
             else {
                 $order -> add_order_note(__('Payment succsess.'));
@@ -572,15 +574,10 @@ class WC_SC extends WC_Payment_Gateway
             // send order email manually
         //    WC()->mailer()->emails['WC_Email_Customer_Processing_Order']->trigger($order_id);
             
-            // clear session variables for the order
-            if(isset($_SESSION['SC_Variables'])) {
-                unset($_SESSION['SC_Variables']);
-            }
-            
             echo 
                 '<script>'
                     .'window.location.href = "'
-                        .$params['error_url'].'&status=success&api=rest";'
+                        .$params['error_url'].'&status=success&wc-api=WC_SC_Rest";'
                 .'</script>';
             
             exit;
@@ -588,11 +585,12 @@ class WC_SC extends WC_Payment_Gateway
         # ERROR - not existing payment api
         else {
             $this->create_log('the payment api is set to: '.$this->payment_api, 'Payment form ERROR: ');
+            
             echo 
                 '<script>'
                     .'window.location.href = "'
-                        .$params['error_url'].'&ppp_status=failed&invoice_id='
-                        .$order_id.'&api=rest&reason=not existing payment API'
+                        .$params['error_url'].'&status=failed&invoice_id='
+                        .$order_id.'&wc-api=WC_SC_Rest&reason=not existing payment API'
                 .'</script>';
             exit;
         }
@@ -640,98 +638,79 @@ class WC_SC extends WC_Payment_Gateway
      **/
     public function process_sc_notification()
     {
-        global $woocommerce;
-
+        $this->create_log('', 'call process_sc_notification()');
 		try {
-			$arr = explode("_",$_REQUEST['invoice_id']);
-			$order_id  = $arr[0];
-			$order = new WC_Order($order_id);
-			
-            if ($order){
-				$verified = false;
-				// md5sig validation
-				if ($this->secret) {
-					$hash  =  $this->secret.$_REQUEST['ppp_status'] . $_REQUEST['PPP_TransactionID'];
-					$md5hash = md5($hash);
-					$md5sig = $_REQUEST['responsechecksum'];
-					if ($md5hash == $md5sig) {
-						$verified = true;
-					}
-				}
-			}
+            // Cashier DMN
+            if(@$_REQUEST['invoice_id'] !== '') {
+                $arr = explode("_",$_REQUEST['invoice_id']);
+                $order_id  = $arr[0];
+                $order = new WC_Order($order_id);
 
-			if ($verified) {
-				$status = $_REQUEST['Status'];
-				$transactionType = $_REQUEST['transactionType'];
-				
-                echo "Transaction Type: ".$transactionType;
-				
-                if ( ($transactionType=='Void') || ($transactionType=='Chargeback') || ($transactionType=='Credit') ){
-                    $status = 'CANCELED';
-				}
-
-				switch($status) {
-					case 'CANCELED':
-						$message = 'Payment status changed to:'.$transactionType.'. PPP_TransactionID = '.$_REQUEST['PPP_TransactionID'].", Status = ".$status.', GW_TransactionID = '.$this->request->get['TransactionID'];
-						$this -> msg['message'] = $message;
-                        $this -> msg['class'] = 'woocommerce_message';
-						$order -> update_status('failed');
-						$order -> add_order_note('Failed');
-						$order -> add_order_note($this->msg['message']);
-					break;
-
-					case 'APPROVED':
-						$message ='The amount has been authorized and captured by '. SC_GATEWAY_TITLE .'. PPP_TransactionID = '.$_REQUEST['PPP_TransactionID'].", Status = ".$status.", TransactionType = ".$transactionType.', GW_TransactionID = '.$_REQUEST['TransactionID'];
-						$this -> msg['message'] = $message;
-                        $this -> msg['class'] = 'woocommerce_message';
-						$order -> payment_complete($order_id);
-						
-						$order->update_status( 'completed' );
-						$order -> add_order_note(SC_GATEWAY_TITLE .' payment is successful<br/>Unique Id: '.$_REQUEST['PPP_TransactionID']);
-						$order -> add_order_note($this->msg['message']);
-						$woocommerce -> cart -> empty_cart();
-					break;
-
-					case 'ERROR':
-					case 'DECLINED':
-						$message ='Payment failed. PPP_TransactionID = '.$this->request->get['PPP_TransactionID'].", Status = ".$status.", Error code = ".$_REQUEST['ErrCode'].", Message = ".$this->request->get['message'].", TransactionType = ".$transactionType.', GW_TransactionID = '.$_REQUEST['TransactionID'];
-						$this -> msg['message'] = $message;
-                        $this -> msg['class'] = 'woocommerce_message';
-						$order -> update_status('failed');
-						$order -> add_order_note('Failed');
-						$order -> add_order_note($this->msg['message']);
-					break;
-
-					case 'PENDING':
-                        if ($order -> get_status() == 'processing') {
-                          break;
+                if ($order){
+                    $verified = false;
+                    // md5sig validation
+                    if ($this->secret) {
+                        $hash  =  $this->secret . $_REQUEST['ppp_status'] . $_REQUEST['PPP_TransactionID'];
+                        $md5hash = md5($hash);
+                        $md5sig = $_REQUEST['responsechecksum'];
+                        if ($md5hash == $md5sig) {
+                            $verified = true;
                         }
-                        else {
-                            $message ='Payment is still pending '.$_REQUEST['PPP_TransactionID'].", Status = ".$status.", TransactionType = ".$transactionType.', GW_TransactionID = '.$_REQUEST['TransactionID'];
-                            $this -> msg['message'] = $message;
-                            $this -> msg['class'] = 'woocommerce_message woocommerce_message_info';
-                            $order -> add_order_note(SC_GATEWAY_TITLE .' payment status is pending<br/>Unique Id: '.$_REQUEST['PPP_TransactionID']);
-                            $order -> add_order_note($this->msg['message']);
-                            $order -> update_status('on-hold');
-                            $woocommerce -> cart -> empty_cart();
-                        };
-                    break;
-				}
+                    }
+                }
 
-			}
+                if ($verified) {
+                    $status = $_REQUEST['Status'];
+                    $transactionType = $_REQUEST['transactionType'];
+
+                    echo "Transaction Type: ".$transactionType;
+
+                    if ( ($transactionType=='Void') || ($transactionType=='Chargeback') || ($transactionType=='Credit') ){
+                        $status = 'CANCELED';
+                    }
+                    
+                    $this->change_order_status($order, $order_id, $status, $transactionType);
+                }
+                else {
+                    $this -> msg['class'] = 'error';
+                    $this -> msg['message'] = "Security Error. Illegal access detected";
+                    $order -> update_status('failed');
+                    $order -> add_order_note('Failed');
+                    $order -> add_order_note($this->msg['message']);
+                }
+
+                add_action('the_content', array(&$this, 'showMessage'));
+            }
+            // REST API DMN
             else {
-				$this -> msg['class'] = 'error';
-				$this -> msg['message'] = "Security Error. Illegal access detected";
-				$order -> update_status('failed');
-				$order -> add_order_note('Failed');
-				$order -> add_order_note($this->msg['message']);
-			}
-            
-			add_action('the_content', array(&$this, 'showMessage'));
+                $order_id  = $_REQUEST['clientUniqueId'];
+                $order = new WC_Order($order_id);
+                
+                $status = $_REQUEST['Status'];
+                $transactionType = $_REQUEST['transactionType'];
+
+                echo "Transaction Type: " . $transactionType;
+
+                if (
+                    $transactionType == 'Void'
+                    || $transactionType=='Chargeback'
+                    || $transactionType=='Credit'
+                ) {
+                    $status = 'CANCELED';
+                }
+                
+                $this->change_order_status($order, $order_id, $status, $transactionType);
+            }
 		}
         catch(Exception $e){
-			$msg = "Error";
+            $this->create_log($e, 'Error in process_sc_notification(): ');
+			$msg = "Error.";
 		}
+        
+        // clear session variables for the order
+        if(isset($_SESSION['SC_Variables'])) {
+            unset($_SESSION['SC_Variables']);
+        }
 	}
 
 	public function showMessage($content)
@@ -798,6 +777,97 @@ class WC_SC extends WC_Payment_Gateway
                 return 'en';
 		}
 	}
+    
+    /**
+     * Function change_order_status
+     * Change order status of the order.
+     * 
+     * @param object $order
+     * @param int $order_id
+     * @param string $status
+     * @param string $transactionType
+     */
+    private function change_order_status($order, $order_id, $status, $transactionType)
+    {
+        global $woocommerce;
+        
+        switch($status) {
+            case 'CANCELED':
+                $message = 'Payment status changed to:' .$transactionType. '. PPP_TransactionID = '. @$_REQUEST['PPP_TransactionID']. ", Status = " .$status. ', GW_TransactionID = '. @$_REQUEST['TransactionID'];
+                $this -> msg['message'] = $message;
+                $this -> msg['class'] = 'woocommerce_message';
+                $order -> update_status('failed');
+                $order -> add_order_note('Failed');
+                $order -> add_order_note($this->msg['message']);
+            break;
+
+            case 'APPROVED':
+                $message ='The amount has been authorized and captured by '. SC_GATEWAY_TITLE .'. PPP_TransactionID = '. @$_REQUEST['PPP_TransactionID'] .", Status = ". $status .", TransactionType = ". $transactionType .', GW_TransactionID = '. @$_REQUEST['TransactionID'];
+                $this -> msg['message'] = $message;
+                $this -> msg['class'] = 'woocommerce_message';
+                $order -> payment_complete($order_id);
+
+                $order->update_status( 'completed' );
+                $order -> add_order_note(SC_GATEWAY_TITLE .' payment is successful<br/>Unique Id: '. @$_REQUEST['PPP_TransactionID']);
+                $order -> add_order_note($this->msg['message']);
+                $woocommerce -> cart -> empty_cart();
+            break;
+
+            case 'ERROR':
+            case 'DECLINED':
+                $message ='Payment failed. PPP_TransactionID = '. @$_REQUEST['PPP_TransactionID'] .", Status = ". $status .", Error code = ". @$_REQUEST['ErrCode'] .", Message = ". @$_REQUEST['message'] .", TransactionType = ". $transactionType .', GW_TransactionID = '. $_REQUEST['TransactionID'];
+                $this -> msg['message'] = $message;
+                $this -> msg['class'] = 'woocommerce_message';
+                $order -> update_status('failed');
+                $order -> add_order_note('Failed');
+                $order -> add_order_note($this->msg['message']);
+            break;
+
+            case 'PENDING':
+                $ord_status = $order->get_status();
+                if ($ord_status == 'processing' || $ord_status == 'completed') {
+                    break;
+                }
+                
+                $message ='Payment is still pending, PPP_TransactionID '. @$_REQUEST['PPP_TransactionID'] .", Status = ". $status .", TransactionType = ". $transactionType .', GW_TransactionID = '. @$_REQUEST['TransactionID'];
+                $this -> msg['message'] = $message;
+                $this -> msg['class'] = 'woocommerce_message woocommerce_message_info';
+                $order -> add_order_note(SC_GATEWAY_TITLE .' payment status is pending<br/>Unique Id: '. @$_REQUEST['PPP_TransactionID']);
+                $order -> add_order_note($this->msg['message']);
+                $order -> update_status('on-hold');
+                $woocommerce -> cart -> empty_cart();
+            break;
+        }
+        
+        $order->save();
+        $this->save_update_order_numbers($order);
+    }
+    
+    /**
+     * Function save_update_order_numbers
+     * Save or update order AuthCode and TransactionID on status change.
+     * 
+     * @param object $order
+     */
+    private function save_update_order_numbers($order)
+    {
+        // save or update AuthCode and GW Transaction ID
+        $auth_code = isset($_REQUEST['AuthCode']) ? $_REQUEST['AuthCode'] : '';
+        $saved_ac = $order->get_meta(SC_AUTH_CODE_KEY);
+
+        if(!$saved_ac || empty($saved_ac) || $saved_ac !== $auth_code) {
+            $order->update_meta_data(SC_AUTH_CODE_KEY, $auth_code);
+        }
+
+        $gw_transaction_id = isset($_REQUEST['TransactionID']) ? $_REQUEST['TransactionID'] : '';
+        $saved_tr_id = $order->get_meta(SC_GW_TRANS_ID_KEY);
+
+        if(!$saved_tr_id || empty($saved_tr_id) || $saved_tr_id !== $gw_transaction_id) {
+            $order->update_meta_data(SC_GW_TRANS_ID_KEY, $gw_transaction_id, 0);
+        }
+
+        $order->save();
+    }
     
     /**
      * Function create_log

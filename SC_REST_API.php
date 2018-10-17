@@ -37,6 +37,8 @@ class SC_REST_API
     private $use_session_token_url = '';
     private $use_merch_paym_meth_url = '';
     
+    private $notify_url = SC_NOTIFY_URL . 'Rest';
+    
     /**
      * Function sc_refund_order
      * Create a refund
@@ -82,12 +84,12 @@ class SC_REST_API
             'relatedTransactionId'  => $ord_tr_id, // GW Transaction ID
             'authCode'              => $order->get_meta(SC_AUTH_CODE_KEY),
             'comment'               => $refunds[0]->data['reason'], // optional
-            'url'                   => SC_NOTIFY_URL,
+            'url'                   => $this->notify_url,
             'timeStamp'             => $time,
         );
         
         $other_params = array(
-            'urlDetails'            => array('notificationUrl' => SC_NOTIFY_URL),
+            'urlDetails'            => array('notificationUrl' => $this->notify_url),
         );
         
         $this->create_log($ref_parameters, 'refund_parameters: ');
@@ -156,7 +158,7 @@ class SC_REST_API
         }
         
         // create refund note
-        $note = 'Your request - Refund #' . $refunds[0]->id . ', was successful. Please check your e-mail for details!';
+        $note = 'Your request - Refund #' . $refunds[0]->id . ', was successful.';
         $order -> add_order_note(__($note, 'sc'));
         $order->save();
         
@@ -197,6 +199,7 @@ class SC_REST_API
         }
         
         $json_post = json_encode($params);
+        $this->create_log($params, 'json_post as array: ');
 
         // create cURL post
         $ch = curl_init();
@@ -331,7 +334,7 @@ class SC_REST_API
             'paymentMethod'         => $_SESSION['SC_Variables']['APM_data']['payment_method'],
         //    'userAccountDetails'    => '', // optional
         //    'userPaymentOption'     => array(), // optional
-        //    'urlDetails'            => array(), // optional
+            'urlDetails'            => $data['urlDetails'],
         //    'subMethodDetails'      => array(), // optional
             'timeStamp'             => current(explode('_', $_SESSION['SC_Variables']['cri2'])),
             'checksum'              => $data['checksum'],
