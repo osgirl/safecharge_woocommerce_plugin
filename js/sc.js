@@ -1,103 +1,78 @@
-var paymentMethods = {};
 var isAjaxCalled = false;
 var manualChangedCountry = false;
-
-function scGenerateAPMFields(methodName) {
-    jQuery('#apms_modal .modal-body').html('');
-
-    if(typeof paymentMethods[methodName] == 'undefined') {
-        return;
-    }
-
-    // do not show modal beacuse we do not have fileds in it
-    if(paymentMethods[methodName].length == 0) {
-        return;
-    }
-
-    var html = '';
-    for(var idx in paymentMethods[methodName]) {
-        var required = '';
-        var pattern = '';
-        var requiredStar = '';
-        var fieldErrorMsg = '';
-
-        if(typeof paymentMethods[methodName][idx].regex != 'undefined') {
-            required = ' required="required"';
-            pattern = 'pattern="'+ paymentMethods[methodName][idx].regex +'"';
-            requiredStar = '&nbsp;<abbr class="required" title="required">*</abbr>';
-        }
-        
-        if(typeof paymentMethods[methodName][idx].validationmessage != 'undefined') {
-            fieldErrorMsg = 'data-valid-error-msg="'+paymentMethods[methodName][idx].validationmessage[0].message+'"';
-        }
-
-        html +=
-            '<p class="form-row form-row-wide" id="'+ methodName +'_'+ paymentMethods[methodName][idx].name +'" data-o_class="form-row form-row-wide">'
-                +'<label>'+ paymentMethods[methodName][idx].caption[0].message + requiredStar +'</label>'
-                +'<span class="woocommerce-input-wrapper">'
-                    +'<input class="input-text " name="apm_fields['+ paymentMethods[methodName][idx].name +']" type="'+ paymentMethods[methodName][idx].type +'" '+ required +' '+ pattern + ' '+ fieldErrorMsg +' data-apm="'+ methodName +'">'
-                +'</span>'
-            +'</p>';
-    }
-
-    jQuery('#apms_modal .modal-body').html(html);
-    jQuery('#apms_modal').modal('toggle');
- }
 
  /**
   * Function validateScAPMsModal
   * When click save on modal, check for mandatory fields and validate them.
   */
- function scValidateAPMsModal() {
-    var errorMsgTxt = '';
+ function scValidateAPMFields() {
     var formValid = true;
-    
-    jQuery('#apms_modal').find('input').each(function(){
-        var self = jQuery(this);
-        
-        if(self.prop('required') == true) {
-            var regex = null;
-            var apmFields = paymentMethods[self.attr('data-apm')];
+     
+    if(jQuery('li.apm_container').length > 0) {
+        jQuery('li.apm_container').each(function(){
+            var self = jQuery(this);
+            var radioBtn = self.find('input.sc_payment_method_field');
             
-            if(self.attr('pattern') != '') {
-                regex = new RegExp(self.attr('pattern'), "i");
-            }
-            
-            if(regex != null) {
-                if(regex.test(self.val()) == false || self.val() == '') {
-                    if(self.attr('data-valid-error-msg') != '') {
-                        errorMsgTxt += self.attr('data-valid-error-msg') + "\n";
-                    }
+            if(radioBtn.is(':checked')) {
+                var apmField = self.find('.apm_field input');
+                
+                if (
+                    typeof apmField.attr('pattern') != 'undefined'
+                    && apmField.attr('pattern') !== false
+                    && apmField.attr('pattern') != ''
+                ) {
+                    var regex = new RegExp(apmField.attr('pattern'), "i");
+                    
+                    if(regex.test(apmField.val()) == false || apmField.val() == '') {
+                        // SHOW error
+                        apmField.parent('.apm_field').find('.apm_error')
+                            .removeClass('error_info')
+                            .show();
+                    
+                    //    apmField.css('border-bottom', '0.1rem solid red !important');
 
-                    self.parents('p').addClass('woocommerce-invalid');
-                    formValid = false;
-                }
-                else {
-                    self.parents('p').removeClass('woocommerce-invalid');
+                        formValid = false;
+                    }
+                    else {
+                        // HIDE error
+                        apmField.parent('.apm_field').find('.error').hide();
+                        apmField.css('border-bottom', '0.1rem solid #9B9B9B !important');
+                    }
                 }
             }
-        }
-    });
-    
-    if(formValid == false) {
-        if(errorMsgTxt != '') {
-            alert(errorMsgTxt);
-        }
+        });
     }
-    else {
-        jQuery('#apms_modal').modal('hide');
+    
+    if(formValid) {
+        jQuery('form.woocommerce-checkout').submit();
     }
  }
  
- // custom function to close the modal
- function closeACAPMsModal() {
-    jQuery('input.sc_payment_method_field').each(function(){
-        jQuery(this).prop('checked', false);
-    });
-    jQuery('#apms_modal').modal('toggle');
+ /**
+  * Function showError
+  * Show error message as information about the field.
+  * 
+  * @param {int} elemId
+  */
+ function showError(elemId) {
+    jQuery('#error_'+elemId).addClass('error_info');
+
+    if(jQuery('#error_'+elemId).css('display') == 'block') {
+        jQuery('#error_'+elemId).hide();
+    }
+    else {
+        jQuery('#error_'+elemId).show();
+    }
  }
  
 jQuery(function() {
+    // change behavior of "Place order" button so can validate mandatory APM fields
+    jQuery('body').on('change', '#order_review', function () {
+        jQuery('form.woocommerce-checkout button[type=submit]')
+            .attr('type', 'button')
+            .attr('onclick', 'scValidateAPMFields()');
+    });
+
     var billing_country_first_val = jQuery("#billing_country").val();
     
     jQuery("#billing_country").change(function() {
@@ -120,27 +95,71 @@ jQuery(function() {
             })
                 .done(function(resp){
                     if(
-                        resp.status == 1
-                        && typeof resp.data.paymentMethods != 'unknown'
-                        && resp.data.paymentMethods.length > 0
+                        typeof resp != 'undefined'
+                        && resp !== null
+                        && resp.status == 1
+                        && typeof resp.data['paymentMethods'] != 'unknown'
+                        && resp.data['paymentMethods'].length > 0
                     ) {
                         var html = '';
-                        var pMethods = resp.data.paymentMethods;
+                        var pMethods = resp.data['paymentMethods'];
+                        
+                        html +=
+                            '<ul id="sc_apms_list">';
 
                         for(var i in pMethods) {
+                            var newImg = pMethods[i]['logoURL'].replace('/svg/', '/svg/solid-white/');
+                            
                             html +=
-                                '<div style="paddin:10px 0px;" class="sc_apms">'
-                                    +'<br/>'
-                                    +'<label>'
-                                        +'<input id="payment_method_'+ pMethods[i].paymentMethod +'" type="radio" class="input-radio sc_payment_method_field" name="payment_method_sc" value="'+ pMethods[i].paymentMethod +'" onchange="scGenerateAPMFields(this.value)" required="required" />&nbsp;&nbsp;'
-                                        +pMethods[i]['paymentMethodDisplayName'][0]['message']+ ' '
-                                        +'<img src="'+ pMethods[i]['logoURL'] +'" style="height:20px;">'
-                                    +'</label>'
-                                +'</div>';
-                                
+                                '<li class="apm_container">'
+                                    +'<div class="apm_title">'
+                                        +'<img src="'+ newImg +'" alt="'+pMethods[i]['paymentMethodDisplayName'][0]['message']+'">'
+                                        +'<input id="sc_payment_method_'+ pMethods[i].paymentMethod +'" type="radio" class="input-radio sc_payment_method_field" name="payment_method_sc" value="'+ pMethods[i].paymentMethod +'" />'
+                                        +'<span class=""></span>'
+                                    +'</div>'
+                                    
+                                    +'<div class="apm_fields">'
+                            
+                            // create fields for the APM
+                            for(var j in pMethods[i].fields) {
+                                var pattern = '';
+                                var fieldErrorMsg = '';
 
-                            paymentMethods[pMethods[i].paymentMethod] = pMethods[i].fields;
+                                if(typeof pMethods[i].fields[j].regex != 'undefined') {
+                                    pattern = 'pattern="'+ pMethods[i].fields[j].regex +'"';
+                                }
+
+                                if(typeof pMethods[i].fields[j].validationmessage != 'undefined') {
+                                    fieldErrorMsg = pMethods[i].fields[j].validationmessage[0].message;
+                                }
+                                
+                                html +=
+                                        '<div class="apm_field">'
+                                            +'<input name="'+ pMethods[i].paymentMethod +'['+ pMethods[i].fields[j].name +']" type="'+ pMethods[i].fields[j].type +'" '+ pattern + ' '+ fieldErrorMsg +' placeholder="'+ pMethods[i].fields[j].caption[0].message +'" autocomplete="off" />';
+                                    
+                                if(pattern != '') {
+                                    html +=
+                                            '<span class="question_mark" onclick="showError(\'sc_'+ pMethods[i].fields[j].name +'\')"><span class="tooltip-icon"></span></span>';
+                                }
+                                
+                                if(pattern != '') {
+                                    html +=
+                                            '<div class="apm_error" id="error_sc_'+ pMethods[i].fields[j].name +'">'
+                                                +'<label>'+fieldErrorMsg+'</label>'
+                                            +'</div>';
+                                }
+                                
+                                html +=
+                                        '</div><!-- apm_field -->';
+                            }
+                                
+                            html +=
+                                    '</div><!-- apm_fields -->'
+                                +'</li>';
                         }
+                        
+                        html +=
+                            '</ul>';
                         
                         // wait until checkout is updated
                         jQuery( document ).on( 'updated_checkout', function() {
@@ -148,6 +167,11 @@ jQuery(function() {
                             jQuery('#payment').find('.sc_apms').remove();
                             
                             if(html != '') {
+                                // clean old APMs
+                                if(jQuery('.payment_method_sc:last').find('ul#sc_apms_list').length > 0) {
+                                    jQuery('.payment_method_sc:last').find('ul#sc_apms_list').remove();
+                                }
+                                
                                 // insert the html
                                 jQuery('.payment_method_sc:last').append(html);
                                 jQuery('form[name="checkout"]').attr('onsubmit', "return false;");
@@ -158,4 +182,35 @@ jQuery(function() {
         }
     });
     
+    // when click on APM payment method
+    jQuery('form.woocommerce-checkout').on('click', '.apm_title', function() {
+        // hide all check marks 
+        jQuery('#sc_apms_list').find('.apm_title span').removeClass('apm_selected');
+        
+        // hide all containers with fields
+        jQuery('#sc_apms_list').find('.apm_fields').each(function(){
+            var self = jQuery(this);
+            if(self.css('display') == 'block') {
+                self.slideToggle('slow');
+            }
+        });
+        
+        // mark current payment method
+        jQuery(this).find('span').addClass('apm_selected');
+        
+        // expand payment fields
+        if(jQuery(this).parent('li').find('.apm_fields').css('display') == 'none') {
+            jQuery(this).parent('li').find('.apm_fields').slideToggle('slow');
+        }
+        
+        // unchck SC payment methods
+        jQuery('form.woocommerce-checkout').find('sc_payment_method_field').attr('checked', false);
+        // check current radio
+        jQuery(this).find('input').attr('checked', true);
+        
+        // hide errors
+        jQuery('.apm_error').hide();
+    });
+    
 });
+// document ready function END

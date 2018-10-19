@@ -210,8 +210,7 @@ class WC_SC extends WC_Payment_Gateway
             echo wpautop(wptexturize($this -> description));
         }
         
-        // output modal for APMs fields, if need
-        echo file_get_contents(dirname(__FILE__).'/views/apms_modal.php');
+        // echo here some html part if needed
     }
 
 	/**
@@ -610,8 +609,12 @@ class WC_SC extends WC_Payment_Gateway
         if(isset($_POST, $_POST['payment_method_sc']) && !empty($_POST['payment_method_sc'])) {
             $_SESSION['SC_Variables']['APM_data']['payment_method'] = $_POST['payment_method_sc'];
             
-            if(isset($_POST['apm_fields']) && !empty($_POST['apm_fields']) && is_array($_POST['apm_fields'])) {
-                $_SESSION['SC_Variables']['APM_data']['apm_fields'] = $_POST['apm_fields'];
+            if(
+                isset($_POST[$_POST['payment_method_sc']])
+                && !empty($_POST[$_POST['payment_method_sc']]) 
+                && is_array($_POST[$_POST['payment_method_sc']])
+            ) {
+                $_SESSION['SC_Variables']['APM_data']['apm_fields'] = $_POST[$_POST['payment_method_sc']];
             }
         }
         

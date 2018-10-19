@@ -52,7 +52,7 @@ function woocommerce_add_sc_gateway($methods)
 // first method we come in
 function sc_enqueue($hook)
 {
-    // load external files
+    # load external files
     $plugin_dir = basename(dirname(__FILE__));
    
     wp_register_script("sc_js_script", WP_PLUGIN_URL . '/' . $plugin_dir . '/js/sc.js', array('jquery') );
@@ -66,13 +66,10 @@ function sc_enqueue($hook)
     wp_enqueue_script( 'jquery' );
     wp_enqueue_script( 'sc_js_script' );
     
-    // bootstrap modal
-    wp_register_script ('sc_bs_modal', WP_PLUGIN_URL. '/'. $plugin_dir. '/js/bootstrap.min.js', array( 'jquery' ), '1', true );
-    wp_register_style ('sc_bs_modal_style',  WP_PLUGIN_URL. '/'. $plugin_dir. '/css/sc_bs_modal.css', '' , '', 'all' );
-    
-    wp_enqueue_script( 'sc_bs_modal' );
-	wp_enqueue_style( 'sc_bs_modal_style' );
-    // load external files END
+    // novo style
+    wp_register_style ('novo_style', WP_PLUGIN_URL. '/'. $plugin_dir. '/css/novo.css', '' , '', 'all' );
+    wp_enqueue_style( 'novo_style' );
+    # load external files END
 }
 
 // show final payment text, when use REST API we change order status here

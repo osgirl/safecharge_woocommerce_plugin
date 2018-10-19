@@ -1,0 +1,128 @@
+@font-face {
+    font-family: 'icobase';
+    src: url('fonts/icobase.eot?ujixn1');
+    src: url('fonts/icobase.eot?#iefixujixn1') format('embedded-opentype'),
+        url('fonts/icobase.ttf?ujixn1') format('truetype'),
+        url('fonts/icobase.woff?ujixn1') format('woff'),
+        url('fonts/icobase.svg?ujixn1#icobase') format('svg');
+    font-weight: normal;
+    font-style: normal
+}
+
+#sc_apms_list {
+    box-shadow: 0 2px 4px 0 rgba(0,0,0,0.19);
+}
+
+.apm_container {
+    width: 100%;
+    min-height: 4rem;
+    height: 100%;
+    cursor: pointer;
+    padding: 1rem 0 0 0;
+    background-color: #FFFFFF;
+}
+
+.apm_title {
+    border-bottom: .1rem solid #939393;
+    padding-left: 0.7em;
+    padding-bottom: 0.5em;
+    position: relative;
+}
+
+.apm_fields {
+    display: none;
+    background-color: #fafafa;
+    border-bottom: .1rem solid #9B9B9B !important;
+}
+
+.apm_field {
+    padding-left: 0.7em;
+    padding-right: 0.7em;
+    padding-top: 1em;
+    position: relative;
+}
+
+.apm_field .question_mark {
+    top: 26px;
+    position: absolute;
+    right: 0.7rem;
+}
+
+.apm_field .question_mark:before {
+    content: '\e902';
+    font-family: icobase;
+    font-size: 1.1rem;
+    color: #14B5F1;
+}
+
+.apm_field input {
+    border: 0 !important;
+    background-color: inherit !important;
+    border-bottom: .1rem solid #9B9B9B !important;
+    border-radius: 0px !important;
+    padding-bottom: 1px !important;
+    padding-left: 0px !important;
+    padding-right: 0px !important;
+}
+
+/* Chrome, Firefox, Opera, Safari 10.1+ */
+.apm_field input::placeholder {
+    color: #9B9B9B !important;
+    opacity: 1; /* Firefox */
+}
+
+/* Internet Explorer 10-11 */
+.apm_field input:-ms-input-placeholder {
+    color: #9B9B9B !important;
+}
+
+/* Microsoft Edge */
+.apm_field input::-ms-input-placeholder {
+    color: #9B9B9B !important;
+}
+
+.apm_error {
+    background: none;
+    width: 100%;
+    margin-top: 0.2rem;
+    display: none;
+}
+
+.apm_error label {
+    color: #E7463B;
+    font-size: 12px;
+    text-align: left;
+    font-weight: normal;
+}
+
+.apm_error.error_info label {
+    color: #9B9B9B;
+    font-style: italic;
+}
+
+/* fixes for last field borders */
+.apm_fields .apm_field:last-child input {
+	border: 0 !important;
+}
+
+.apm_fields .apm_field:last-child .apm_error {
+	border-top: .1rem solid #9B9B9B !important;
+	margin-top: 0px;
+	padding-top: 0.2rem;
+	margin-top: 2px;
+}
+/* fixes for last field borders END */
+
+.sc_payment_method_field {
+    visibility: hidden;
+}
+
+.apm_title .apm_selected {
+    background: url("data:image/svg+xml,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20viewBox%3D%220%200%2016.43%2012.6%22%3E%3Ctitle%3Eicon-checkmark%3C%2Ftitle%3E%3Cpath%20d%3D%22M16.43%2C2.46a1%2C1%2C0%2C0%2C1-.3.72L7%2C12.3a1%2C1%2C0%2C0%2C1-1.44%2C0L.3%2C7a1%2C1%2C0%2C0%2C1%2C0-1.44L1.74%2C4.14a1%2C1%2C0%2C0%2C1%2C.72-.3%2C1%2C1%2C0%2C0%2C1%2C.72.3L6.3%2C7.26l7-7A1%2C1%2C0%2C0%2C1%2C14.7.3l1.44%2C1.44A1%2C1%2C0%2C0%2C1%2C16.43%2C2.46Z%22%20fill%3D%22%231ECE80%22%2F%3E%3C%2Fsvg%3E") no-repeat center center;
+    width: 1.2rem;
+    height: 1.2rem;
+    display: block;
+    position: absolute;
+    right: 1rem;
+    bottom: 1.3rem;
+}
