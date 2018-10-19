@@ -66,13 +66,6 @@ var manualChangedCountry = false;
  }
  
 jQuery(function() {
-    // change behavior of "Place order" button so can validate mandatory APM fields
-    jQuery('body').on('change', '#order_review', function () {
-        jQuery('form.woocommerce-checkout button[type=submit]')
-            .attr('type', 'button')
-            .attr('onclick', 'scValidateAPMFields()');
-    });
-
     var billing_country_first_val = jQuery("#billing_country").val();
     
     jQuery("#billing_country").change(function() {
@@ -94,11 +87,13 @@ jQuery(function() {
                 dataType: 'json'
             })
                 .done(function(resp){
+                    console.log(resp);
+                    
                     if(
                         typeof resp != 'undefined'
                         && resp !== null
                         && resp.status == 1
-                        && typeof resp.data['paymentMethods'] != 'unknown'
+                        && typeof resp.data['paymentMethods'] != 'undefined'
                         && resp.data['paymentMethods'].length > 0
                     ) {
                         var html = '';
@@ -135,7 +130,7 @@ jQuery(function() {
                                 
                                 html +=
                                         '<div class="apm_field">'
-                                            +'<input name="'+ pMethods[i].paymentMethod +'['+ pMethods[i].fields[j].name +']" type="'+ pMethods[i].fields[j].type +'" '+ pattern + ' '+ fieldErrorMsg +' placeholder="'+ pMethods[i].fields[j].caption[0].message +'" autocomplete="off" />';
+                                            +'<input id="'+ pMethods[i].fields[j].name +'" name="'+ pMethods[i].paymentMethod +'['+ pMethods[i].fields[j].name +']" type="'+ pMethods[i].fields[j].type +'" '+ pattern + ' '+ fieldErrorMsg +' placeholder="'+ pMethods[i].fields[j].caption[0].message +'" autocomplete="off" />';
                                     
                                 if(pattern != '') {
                                     html +=
@@ -175,6 +170,11 @@ jQuery(function() {
                                 // insert the html
                                 jQuery('.payment_method_sc:last').append(html);
                                 jQuery('form[name="checkout"]').attr('onsubmit', "return false;");
+                                
+                                // change submit button type and behavior
+                                jQuery('form.woocommerce-checkout button[type=submit]')
+                                    .attr('type', 'button')
+                                    .attr('onclick', 'scValidateAPMFields()');
                             }
                         });
                     }

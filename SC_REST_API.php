@@ -235,8 +235,17 @@ class SC_REST_API
     {
         require_once 'sc_config.php';
         
+        $this->create_log($data, 'Params for Session Token: ');
+        
         // getSessionToken
-        $session_token = $this->get_session_token($data);
+        $session_token_data = $this->get_session_token($data);
+        $session_token = $session_token_data['sessionToken'];
+        
+        if(!$session_token) {
+            $this->create_log('', 'Session Token is FALSE.');
+            echo json_encode(array('status' => 0));
+            exit;
+        }
         
         # get merchant payment methods
         $checksum_params = array(
@@ -277,9 +286,11 @@ class SC_REST_API
     public function process_payment($data)
     {
         $this->use_apm_payment_url = $this->test_apm_payment_url;
-        if($_SESSION['test'] == 'no') {
+        if($_SESSION['SC_Variables']['test'] == 'no') {
             $this->use_apm_payment_url = $this->live_apm_payment_url;
         }
+        
+        echo 'process_payment Data: <pre>'.print_r($data,true).'</pre>';
         
         $session_token = $this->get_session_token($data);
         $time = date('YmdHis', time());
@@ -287,8 +298,8 @@ class SC_REST_API
         $params = array(
             'sessionToken'      => $session_token,
         //    'orderId'         => $session_token, // optional
-            'merchantId'        => $_SESSION['merchant_id'],
-            'merchantSiteId'    => $_SESSION['merchantsite_id'],
+            'merchantId'        => $_SESSION['SC_Variables']['merchant_id'],
+            'merchantSiteId'    => $_SESSION['SC_Variables']['merchantsite_id'],
             'userTokenId'       => '', // optional - ID of the user in the merchant’s system.
             'clientUniqueId'    => $_REQUEST['order-pay'],
             'clientRequestId'   => $data['client_request_id'],
@@ -349,14 +360,6 @@ class SC_REST_API
             $data['checksum']
         );
         
-//        echo print_r($_SESSION['merchant_id'], true).'</pre><br/>';
-//        echo print_r($_SESSION['merchantsite_id'], true).'</pre><br/>';
-//        echo print_r($data['client_request_id'], true).'</pre><br/>';
-//        echo print_r($data['total_amount'], true).'</pre><br/>';
-//        echo print_r($data['currency'], true).'</pre><br/>';
-//        echo print_r(current(explode('_', $data['client_request_id'])), true).'</pre><br/>';
-//        echo print_r($data['checksum'], true).'</pre><br/>';
-        
     //    echo '<h4>Payment APM resp: </h4><pre>'.print_r($resp, true).'</pre>';
         
         if(!is_array(@$resp)) {
@@ -371,28 +374,33 @@ class SC_REST_API
      * Get session tokens for different actions with the REST API
      * 
      * @param array $data
-     * @return string|bool
+     * @return array|bool
      */
     private function get_session_token($data)
     {
+        if(!isset($_SESSION['SC_Variables']['merchant_id'], $_SESSION['SC_Variables']['merchantsite_id'])) {
+            $this->create_log('', 'No session variables. ');
+            return false;
+        }
+        
         $time = date('YmdHis', time());
 
         $params = array(
-            'merchantId'        => $_SESSION['merchant_id'],
-            'merchantSiteId'    => $_SESSION['merchantsite_id'],
-            'clientRequestId'   => $_SESSION['cri1'],
-            'timeStamp'         => current(explode('_', $_SESSION['cri1'])),
+            'merchantId'        => $_SESSION['SC_Variables']['merchant_id'],
+            'merchantSiteId'    => $_SESSION['SC_Variables']['merchantsite_id'],
+            'clientRequestId'   => $_SESSION['SC_Variables']['cri1'],
+            'timeStamp'         => current(explode('_', $_SESSION['SC_Variables']['cri1'])),
         );
 
         $resp_arr = $this->call_rest_api(
-            $_SESSION['test'] == 'yes' ? SC_TEST_SESSION_TOKEN_URL : SC_LIVE_SESSION_TOKEN_URL,
+            $_SESSION['SC_Variables']['test'] == 'yes' ? SC_TEST_SESSION_TOKEN_URL : SC_LIVE_SESSION_TOKEN_URL,
             $params,
             '',
             '',
             array(),
-            $_SESSION['cs1']
+            $_SESSION['SC_Variables']['cs1']
         );
-  
+        
         if(
             !$resp_arr
             || !is_array($resp_arr)
@@ -403,7 +411,7 @@ class SC_REST_API
             return false;
         }
         
-        return $resp_arr['sessionToken'];
+        return $resp_arr;
     }
     
     /**
@@ -476,7 +484,8 @@ if(
         ,$_SESSION['SC_Variables']['test']
         ,$_POST['callFromJS']
     )
-    && $_SERVER['HTTP_X_REQUESTED_WITH'] === 'XMLHttpRequest'
+    && $_SESSION['SC_Variables']['payment_api'] == 'rest'
+    && $_SERVER['HTTP_X_REQUESTED_WITH'] == 'XMLHttpRequest'
     // set shis param in JS call to separate JS call from simple class load
     && $_POST['callFromJS'] == 1
 ) {
@@ -486,7 +495,7 @@ if(
         $apms_getter->get_rest_apms($_SESSION['SC_Variables']);
     }
     // WC calls this method twice, so we want to get APMs only on first call
-    elseif($_SESSION['SC_Variables']['payment_api'] == 'rest') {
+    else {
         $_SESSION['SC_Variables']['sc_country'] = $_POST['country'];
         
         $apms_getter = new SC_REST_API();
