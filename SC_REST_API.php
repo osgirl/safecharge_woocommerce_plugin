@@ -180,48 +180,54 @@ class SC_REST_API
      */
     public function call_rest_api($url, $checksum_params, $secret, $hash, $other_params = array(), $checksum = '')
     {
-        $checksum_params['checksum'] = $checksum;
-        
-        if($checksum == '') {
-            foreach($checksum_params as $val) {
-                $checksum .= $val;
+        try {
+            $checksum_params['checksum'] = $checksum;
+
+            if($checksum == '') {
+                foreach($checksum_params as $val) {
+                    $checksum .= $val;
+                }
+
+                $checksum .= $secret;
+                $checksum_params['checksum'] = hash($hash, $checksum);
             }
 
-            $checksum .= $secret;
-            $checksum_params['checksum'] = hash($hash, $checksum);
-        }
-        
-        if(!empty($other_params) and is_array($other_params)) {
-            $params = array_merge($checksum_params, $other_params);
-        }
-        else {
-            $params = $checksum_params;
-        }
-        
-        $json_post = json_encode($params);
-        $this->create_log($params, 'json_post as array: ');
+            if(!empty($other_params) and is_array($other_params)) {
+                $params = array_merge($checksum_params, $other_params);
+            }
+            else {
+                $params = $checksum_params;
+            }
 
-        // create cURL post
-        $ch = curl_init();
+            $json_post = json_encode($params);
+            $this->create_log($params, 'json_post as array: ');
 
-        curl_setopt($ch, CURLOPT_URL, $url);
-        curl_setopt($ch, CURLOPT_CUSTOMREQUEST, "POST");
-        curl_setopt($ch, CURLOPT_POSTFIELDS, $json_post);
-        curl_setopt($ch, CURLOPT_HTTPHEADER, array(
-            'Content-Type:application/json', 'Content-Length: ' . strlen($json_post))
-        );
-        curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
-        curl_setopt($ch, CURLOPT_SSL_VERIFYPEER, false);
-        curl_setopt($ch, CURLOPT_SSL_VERIFYHOST, false);
+            // create cURL post
+            $ch = curl_init();
 
-        $resp = curl_exec($ch);
-        curl_close ($ch);
-        
-        if($resp === false) {
+            curl_setopt($ch, CURLOPT_URL, $url);
+            curl_setopt($ch, CURLOPT_CUSTOMREQUEST, "POST");
+            curl_setopt($ch, CURLOPT_POSTFIELDS, $json_post);
+            curl_setopt($ch, CURLOPT_HTTPHEADER, array(
+                'Content-Type:application/json', 'Content-Length: ' . strlen($json_post))
+            );
+            curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
+            curl_setopt($ch, CURLOPT_SSL_VERIFYPEER, false);
+            curl_setopt($ch, CURLOPT_SSL_VERIFYHOST, false);
+
+            $resp = curl_exec($ch);
+            curl_close ($ch);
+
+            if($resp === false) {
+                return false;
+            }
+
+            return json_decode($resp, true);
+        }
+        catch(Exception $e) {
+            $this->create_log($e, 'Catche error when call to REST API: ');
             return false;
         }
-        
-        return json_decode($resp, true);
     }
     
     /**

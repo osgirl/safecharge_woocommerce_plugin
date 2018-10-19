@@ -23,20 +23,17 @@ var manualChangedCountry = false;
                 ) {
                     var regex = new RegExp(apmField.attr('pattern'), "i");
                     
+                    // SHOW error
                     if(regex.test(apmField.val()) == false || apmField.val() == '') {
-                        // SHOW error
                         apmField.parent('.apm_field').find('.apm_error')
                             .removeClass('error_info')
                             .show();
                     
-                    //    apmField.css('border-bottom', '0.1rem solid red !important');
-
                         formValid = false;
                     }
+                    // HIDE error
                     else {
-                        // HIDE error
                         apmField.parent('.apm_field').find('.error').hide();
-                        apmField.css('border-bottom', '0.1rem solid #9B9B9B !important');
                     }
                 }
             }
@@ -49,12 +46,12 @@ var manualChangedCountry = false;
  }
  
  /**
-  * Function showError
+  * Function showErrorLikeInfo
   * Show error message as information about the field.
   * 
   * @param {int} elemId
   */
- function showError(elemId) {
+ function showErrorLikeInfo(elemId) {
     jQuery('#error_'+elemId).addClass('error_info');
 
     if(jQuery('#error_'+elemId).css('display') == 'block') {
@@ -87,8 +84,6 @@ jQuery(function() {
                 dataType: 'json'
             })
                 .done(function(resp){
-                    console.log(resp);
-                    
                     if(
                         typeof resp != 'undefined'
                         && resp !== null
@@ -113,7 +108,7 @@ jQuery(function() {
                                         +'<span class=""></span>'
                                     +'</div>'
                                     
-                                    +'<div class="apm_fields">'
+                                    +'<div class="apm_fields">';
                             
                             // create fields for the APM
                             for(var j in pMethods[i].fields) {
@@ -134,7 +129,7 @@ jQuery(function() {
                                     
                                 if(pattern != '') {
                                     html +=
-                                            '<span class="question_mark" onclick="showError(\'sc_'+ pMethods[i].fields[j].name +'\')"><span class="tooltip-icon"></span></span>';
+                                            '<span class="question_mark" onclick="showErrorLikeInfo(\'sc_'+ pMethods[i].fields[j].name +'\')"><span class="tooltip-icon"></span></span>';
                                 }
                                 
                                 if(pattern != '') {
@@ -145,11 +140,11 @@ jQuery(function() {
                                 }
                                 
                                 html +=
-                                        '</div><!-- apm_field -->';
+                                        '</div>';
                             }
                                 
                             html +=
-                                    '</div><!-- apm_fields -->'
+                                    '</div>'
                                 +'</li>';
                         }
                         

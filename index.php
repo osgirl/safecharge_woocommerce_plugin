@@ -3,7 +3,7 @@
 Plugin Name: SafeCharge WooCommerce PlugIn
 Plugin URI: http://www.safecharge.com
 Description: SafeCharge gateway for woocommerce
-Version: 1.1
+Version: 1.3.1
 Author: SafeCharge
 Author URI:http://safecharge.com
 */
@@ -33,11 +33,8 @@ function woocommerce_sc_init()
     // try to catch ajax
     add_action( 'wp_ajax_my_action', 'my_action' );
     add_action( 'wp_ajax_nopriv_my_action', 'my_action' );
-    
     // Check checkout for selected apm ONLY when payment api is REST
-    if(isset($_SESSION['SC_Variables']['payment_api']) && $_SESSION['SC_Variables']['payment_api'] == 'rest') {
-        add_action( 'woocommerce_checkout_process', 'sc_check_checkout_apm', 20 ) ;
-    }
+    add_action( 'woocommerce_checkout_process', 'sc_check_checkout_apm', 20 ) ;
 }
 
 /**
@@ -78,7 +75,7 @@ function sc_enqueue($hook)
     # load external files END
 }
 
-// show final payment text, when use REST API we change order status here
+// show final payment text
 function sc_show_final_text()
 {
     global $woocommerce;
@@ -149,7 +146,11 @@ function sc_create_refund()
 function sc_check_checkout_apm()
 {
     // if custom fields are empty stop checkout process displaying an error notice.
-    if ( empty($_POST['payment_method_sc']) ) {
+    if(
+        isset($_SESSION['SC_Variables']['payment_api'])
+        && $_SESSION['SC_Variables']['payment_api'] == 'rest'
+        && empty($_POST['payment_method_sc'])
+    ) {
         $notice = __( 'Please select '. SC_GATEWAY_TITLE .' payment method to continue!', 'sc' );
         wc_add_notice( '<strong>' . $notice . '</strong>', 'error' );
     }
