@@ -55,8 +55,14 @@ function sc_enqueue($hook)
     # load external files
     $plugin_dir = basename(dirname(__FILE__));
    
-    // main JS
-    wp_register_script("sc_js_script", WP_PLUGIN_URL . '/' . $plugin_dir . '/js/sc.js', array('jquery') );
+    // main JS, use min on production
+    if(!defined('WP_DEBUG') || WP_DEBUG === false) {
+        wp_register_script("sc_js_script", WP_PLUGIN_URL . '/' . $plugin_dir . '/js/sc.min.js', array('jquery') );
+    }
+    else {
+        wp_register_script("sc_js_script", WP_PLUGIN_URL . '/' . $plugin_dir . '/js/sc.js', array('jquery') );
+    }
+    
     wp_localize_script(
         'sc_js_script',
         'myAjax',
@@ -64,7 +70,6 @@ function sc_enqueue($hook)
             'ajaxurl' => WP_PLUGIN_URL . '/' . $plugin_dir .'/SC_REST_API.php',
         )
     );  
-//    wp_enqueue_script( 'jquery' );
     wp_enqueue_script( 'sc_js_script' );
     
     // novo style
