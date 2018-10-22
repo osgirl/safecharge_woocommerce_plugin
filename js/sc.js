@@ -125,7 +125,7 @@ jQuery(function() {
                                 
                                 html +=
                                         '<div class="apm_field">'
-                                            +'<input id="'+ pMethods[i].fields[j].name +'" name="'+ pMethods[i].paymentMethod +'['+ pMethods[i].fields[j].name +']" type="'+ pMethods[i].fields[j].type +'" '+ pattern + ' '+ fieldErrorMsg +' placeholder="'+ pMethods[i].fields[j].caption[0].message +'" autocomplete="off" />';
+                                            +'<input id="'+ pMethods[i].fields[j].name +'" name="'+ pMethods[i].paymentMethod +'['+ pMethods[i].fields[j].name +']" type="'+ pMethods[i].fields[j].type +'" '+ pattern + ' '+ fieldErrorMsg +' placeholder="'+ pMethods[i].fields[j].caption[0].message +'" autocomplete="new-password" />';
                                     
                                 if(pattern != '') {
                                     html +=
@@ -193,6 +193,10 @@ jQuery(function() {
         // mark current payment method
         jQuery(this).find('span').addClass('apm_selected');
         
+        // hide bottom border of apm_fields if the container is empty
+        if(jQuery(this).parent('li').find('.apm_fields').html() == '') {
+            jQuery(this).parent('li').find('.apm_fields').css('border-bottom', 0);
+        }
         // expand payment fields
         if(jQuery(this).parent('li').find('.apm_fields').css('display') == 'none') {
             jQuery(this).parent('li').find('.apm_fields').slideToggle('slow');
@@ -206,6 +210,5 @@ jQuery(function() {
         // hide errors
         jQuery('.apm_error').hide();
     });
-    
 });
 // document ready function END

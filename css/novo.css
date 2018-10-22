@@ -9,6 +9,10 @@
     font-style: normal
 }
 
+div.payment_method_sc {
+    background-color: #fafafa !important;
+}
+
 #sc_apms_list {
     box-shadow: 0 2px 4px 0 rgba(0,0,0,0.19);
 }
@@ -31,7 +35,7 @@
 .apm_fields {
     display: none;
     background-color: #fafafa;
-    border-bottom: .1rem solid #9B9B9B !important;
+    border-bottom: .1rem solid #9B9B9B;
 }
 
 .apm_field {
@@ -59,7 +63,7 @@
     background-color: inherit !important;
     border-bottom: .1rem solid #9B9B9B !important;
     border-radius: 0px !important;
-    padding-bottom: 1px !important;
+    padding-bottom: 8px !important;
     padding-left: 0px !important;
     padding-right: 0px !important;
 }
@@ -68,16 +72,19 @@
 .apm_field input::placeholder {
     color: #9B9B9B !important;
     opacity: 1; /* Firefox */
+    font-size: 15px;
 }
 
 /* Internet Explorer 10-11 */
 .apm_field input:-ms-input-placeholder {
     color: #9B9B9B !important;
+    font-size: 15px;
 }
 
 /* Microsoft Edge */
 .apm_field input::-ms-input-placeholder {
     color: #9B9B9B !important;
+    font-size: 15px;
 }
 
 .apm_error {
@@ -85,6 +92,7 @@
     width: 100%;
     margin-top: 0.2rem;
     display: none;
+    padding-top: 5px;
 }
 
 .apm_error label {
@@ -101,14 +109,14 @@
 
 /* fixes for last field borders */
 .apm_fields .apm_field:last-child input {
-	border: 0 !important;
+    border: 0 !important;
 }
 
 .apm_fields .apm_field:last-child .apm_error {
-	border-top: .1rem solid #9B9B9B !important;
-	margin-top: 0px;
-	padding-top: 0.2rem;
-	margin-top: 2px;
+    border-top: .1rem solid #9B9B9B !important;
+    margin-top: 0px;
+    padding-top: 15px;
+    margin-top: 2px;
 }
 /* fixes for last field borders END */
 
