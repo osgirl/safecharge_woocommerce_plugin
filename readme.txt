@@ -7,7 +7,7 @@ Wordpress requirements:
 WooCommerce requirements: 
 	- minimum v 3.0
 	- tested up to v3.4
-Stable tag: 1.2
+Stable tag: 1.3.1
 
 == Description ==
 
@@ -43,7 +43,7 @@ Please, contact out Tech-Support team (tech-support@safecharge.com) in case of q
 == Changelog ==
 
 = 1.3.1 - 2018-10-17 =
-* Add - Add SC theme for the APM fields.
+* Add - Added SC Novo Mobile theme for the APM fields.
 
 = 1.3 - 2018-10-02 =
 * Add - Work with REST API payments integration.

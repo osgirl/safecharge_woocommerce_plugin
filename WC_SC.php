@@ -18,9 +18,6 @@ class WC_SC extends WC_Payment_Gateway
     private $test_pay_apm_url = 'https://ppp-test.safecharge.com/ppp/api/v1/paymentAPM.do'; // test
     # payments URLs END
     
-    private $liveWSDL   = 'https://secure.xtpayments.com/PaymentOptionInfoService?wsdl';
-    private $testWSDL   = 'https://ppp-test.safecharge.com/PaymentOptionInfoService?wsdl';
-    
     public function __construct()
     {
         require_once 'SC_Versions_Resolver.php';
@@ -740,7 +737,6 @@ class WC_SC extends WC_Payment_Gateway
     public function setEnvironment()
     {
 		if ($this->test == 'yes'){
-			$this->useWSDL                  = $this->testWSDL;
             $this->use_session_token_url    = SC_TEST_SESSION_TOKEN_URL;
             $this->use_merch_paym_meth_url  = SC_TEST_REST_PAYMENT_METHODS_URL;
             $this->use_pay_apm_url          = $this->live_pay_apm_url;
@@ -754,7 +750,6 @@ class WC_SC extends WC_Payment_Gateway
             }
 		}
         else {
-			$this->useWSDL                  = $this->liveWSDL;
             $this->use_session_token_url    = SC_LIVE_SESSION_TOKEN_URL;
             $this->use_merch_paym_meth_url  = SC_LIVE_REST_PAYMENT_METHODS_URL;
             $this->use_pay_apm_url          = $this->test_pay_apm_url;
