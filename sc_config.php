@@ -29,3 +29,11 @@ define('SC_TEST_SESSION_TOKEN_URL', 'https://ppp-test.safecharge.com/ppp/api/v1/
 // payment methods URL for REST API
 define('SC_LIVE_REST_PAYMENT_METHODS_URL', 'https://secure.safecharge.com/ppp/api/v1/getMerchantPaymentMethods.do');
 define('SC_TEST_REST_PAYMENT_METHODS_URL', 'https://ppp-test.safecharge.com/ppp/api/v1/getMerchantPaymentMethods.do');
+
+// refund REST URLs
+define('SC_LIVE_REFUND_URL', 'https://secure.safecharge.com/ppp/api/v1/refundTransaction.do');
+define('SC_TEST_REFUND_URL', 'https://ppp-test.safecharge.com/ppp/api/v1/refundTransaction.do');
+
+// user CPanel URLs
+define('SC_LIVE_CPANEL_URL', 'cpanel.safecharge.com');
+define('SC_TEST_CPANEL_URL', 'sandbox.safecharge.com');

@@ -4,6 +4,8 @@ if (!session_id()) {
     session_start();
 }
 
+require_once 'sc_config.php';
+
 /**
  * SC_REST_API Class
  * 
@@ -15,63 +17,47 @@ if (!session_id()) {
  */
 class SC_REST_API
 {
-    // the Refund is available ONLY with the REST API
-    private $live_refund_url = 'https://secure.safecharge.com/ppp/api/v1/refundTransaction.do';
-    private $test_refund_url = 'https://ppp-test.safecharge.com/ppp/api/v1/refundTransaction.do';
-    private $use_refund_url = '';
-    
-    // the URLs for APM payments
-    private $live_apm_payment_url = 'https://secure.safecharge.com/ppp/api/v1/paymentAPM.do';
-    private $test_apm_payment_url = 'https://ppp-test.safecharge.com/ppp/api/v1/paymentAPM.do';
-    private $use_apm_payment_url = '';
-    
-    // the two options for user CPanel
-    private $user_test_cpanel_url = 'sandbox.safecharge.com';
-    private $user_live_cpanel_url = 'cpanel.safecharge.com';
-    private $use_cpanel_url = '';
-    
+    private $refund_url = '';
+    private $apm_payment_url = '';
+    private $cpanel_url = '';
     // GW settings
     private $settings = array();
-    
-    // to get APMs we need session token
-    private $use_session_token_url = '';
-    private $use_merch_paym_meth_url = '';
-    
-    private $notify_url = SC_NOTIFY_URL . 'Rest';
+    //private $notify_url = SC_NOTIFY_URL . 'Rest';
     
     /**
      * Function sc_refund_order
-     * Create a refund
+     * Create a refund.
+     * 
+     * @params array $settings - the GW settings
+     * @params string $refund_json - system last refund data as json
+     * @params array $order_meta_data - additional meta data for the order
      */
-    public function sc_refund_order()
+    public function sc_refund_order(array $settings, $refund_json, array $order_meta_data)
     {
-        require_once 'WC_SC.php';
+        $this->settings = $settings;
+        $refund = json_decode($refund_json, true);
         
-        $gateway = new WC_SC();
-        $this->settings = $gateway->settings;
-        
-        $this->use_refund_url = $this->test_refund_url;
-        $this->use_cpanel_url = $this->user_test_cpanel_url;
+        $this->refund_url = SC_TEST_REFUND_URL;
+        $this->cpanel_url = SC_TEST_CPANEL_URL;
         
         if($this->settings['test'] == 'no') {
-            $this->use_refund_url = $this->live_refund_url;
-            $this->use_cpanel_url = $this->user_live_cpanel_url;
+            $this->refund_url = SC_LIVE_REFUND_URL;
+            $this->cpanel_url = SC_LIVE_CPANEL_URL;
         }
         
-        $order = new WC_Order( (int)$_REQUEST['order_id'] );
-        $refunds = $order->get_refunds();
-        
         $time = date('YmdHis', time());
-        $ord_tr_id = $order->get_meta(SC_GW_TRANS_ID_KEY);
+        $ord_tr_id = $order_meta_data['order_tr_id'];
         
         // at the moment with the REST API we do not recieve transaction ID,
         // and we get empty string bleow
         if(!$ord_tr_id || empty($ord_tr_id)) {
-            $note = __('The Order does not have Transaction ID. Refund can not procceed.');
+            $note = __();
             $order -> add_order_note(__($note, 'sc'));
             $order->save();
             
             wp_send_json_success();
+            
+            return 'The Order does not have Transaction ID. Refund can not procceed.';
         }
         
         $ref_parameters = array(
@@ -79,11 +65,11 @@ class SC_REST_API
             'merchantSiteId'        => $this->settings['merchantsite_id'],
             'clientRequestId'       => $time . '_' . $ord_tr_id,
             'clientUniqueId'        => $ord_tr_id,
-            'amount'                => number_format($refunds[0]->data['amount'], 2),
+            'amount'                => number_format($refund['data']['amount'], 2),
             'currency'              => get_woocommerce_currency(),
             'relatedTransactionId'  => $ord_tr_id, // GW Transaction ID
             'authCode'              => $order->get_meta(SC_AUTH_CODE_KEY),
-            'comment'               => $refunds[0]->data['reason'], // optional
+            'comment'               => $refund['data']['reason'], // optional
             'url'                   => $this->notify_url,
             'timeStamp'             => $time,
         );
@@ -96,7 +82,7 @@ class SC_REST_API
         $this->create_log($other_params, 'other_params: ');
         
         $json_arr = $this->call_rest_api(
-            $this->use_refund_url,
+            $this->refund_url,
             $ref_parameters,
             $this->settings['secret'],
             $this->settings['hash_type'],
@@ -105,7 +91,7 @@ class SC_REST_API
         
         $note = '';
         $error_note = 'Please check your e-mail for details and manually delete request Refund #'
-            .$refunds[0]->id.' form the order or login into '. $this->use_cpanel_url
+            .$refund['id'].' form the order or login into '. $this->cpanel_url
             .' and refund Transaction ID '.$ord_tr_id;
         
         if($json_arr === false){
@@ -158,7 +144,7 @@ class SC_REST_API
         }
         
         // create refund note
-        $note = 'Your request - Refund #' . $refunds[0]->id . ', was successful.';
+        $note = 'Your request - Refund #' . $refund['id'] . ', was successful.';
         $order -> add_order_note(__($note, 'sc'));
         $order->save();
         
@@ -291,12 +277,10 @@ class SC_REST_API
      */
     public function process_payment($data)
     {
-        $this->use_apm_payment_url = $this->test_apm_payment_url;
+        $this->apm_payment_url = $this->test_apm_payment_url;
         if($_SESSION['SC_Variables']['test'] == 'no') {
-            $this->use_apm_payment_url = $this->live_apm_payment_url;
+            $this->apm_payment_url = $this->live_apm_payment_url;
         }
-        
-        echo 'process_payment Data: <pre>'.print_r($data,true).'</pre>';
         
         $session_token = $this->get_session_token($data);
         $time = date('YmdHis', time());
@@ -358,7 +342,7 @@ class SC_REST_API
         );
         
         $resp = $this->call_rest_api(
-            $this->use_apm_payment_url,
+            $this->apm_payment_url,
             $params,
             '',
             '',

@@ -137,10 +137,22 @@ function sc_show_final_text()
 
 function sc_create_refund()
 {
-    require_once 'SC_REST_API.php';
+    // get GW so we can use its settings
+    require_once 'WC_SC.php';
+    $gateway = new WC_SC();
     
+    // get order refunds
+    $order = new WC_Order( (int)$_REQUEST['order_id'] );
+    $refunds = $order->get_refunds();
+    $order_meta_data = array(
+        'order_tr_id' => $order->get_meta(SC_GW_TRANS_ID_KEY),
+    );
+    
+    // call refund method
+    require_once 'SC_REST_API.php';
     $sc_api = new SC_REST_API();
-    $sc_api->sc_refund_order();
+    // response must be note to save in the order
+    $resp = $sc_api->sc_refund_order($gateway->settings, json_encode($refunds[0]), $order_meta_data);
 }
 
 function sc_check_checkout_apm()
