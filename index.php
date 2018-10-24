@@ -49,6 +49,28 @@ function woocommerce_add_sc_gateway($methods)
 // first method we come in
 function sc_enqueue($hook)
 {
+    /*  Skip order status update if currentlly received status is 'pending' and curent order status is 'completed'.
+    * For the rest of the cases the status should be updated.   */
+    if(
+        isset($_REQUEST['Status'], $_REQUEST['wc-api'], $_REQUEST['invoice_id'])
+        && $_REQUEST['wc-api'] == 'WC_Gateway_SC'
+        && !empty($_REQUEST['Status'])
+        && !empty($_REQUEST['invoice_id'])
+    ) {
+        $arr = explode("_", $_REQUEST['invoice_id']);
+        $order_id  = $arr[0];
+        $order = new WC_Order($order_id);
+        $order_status = strtolower($order->get_status());
+        
+        if (
+            $order_id
+            && strtolower($_REQUEST['Status']) == 'pending'
+            && $order_status != 'completed'
+        ) {
+            $order->set_status($_REQUEST['Status']);
+        }
+    }
+    
     # load external files
     $plugin_dir = basename(dirname(__FILE__));
    
@@ -146,13 +168,25 @@ function sc_create_refund()
     $refunds = $order->get_refunds();
     $order_meta_data = array(
         'order_tr_id' => $order->get_meta(SC_GW_TRANS_ID_KEY),
+        'auth_code' => $order->get_meta(SC_AUTH_CODE_KEY),
     );
     
     // call refund method
     require_once 'SC_REST_API.php';
     $sc_api = new SC_REST_API();
-    // response must be note to save in the order
-    $resp = $sc_api->sc_refund_order($gateway->settings, json_encode($refunds[0]), $order_meta_data);
+    
+    // execute refund, the response must be note to save in the order
+    $resp = $sc_api->sc_refund_order(
+        $gateway->settings
+        ,json_encode($refunds[0]) // get the last refund
+        ,$order_meta_data
+        ,get_woocommerce_currency()
+        ,SC_NOTIFY_URL . 'Rest'
+    );
+    
+    $order -> add_order_note(__($resp, 'sc'));
+    $order->save();
+    wp_send_json_success();
 }
 
 function sc_check_checkout_apm()

@@ -42,6 +42,9 @@ Please, contact out Tech-Support team (tech-support@safecharge.com) in case of q
 
 == Changelog ==
 
+= 1.4 - 2018-10-24 =
+* New - Independent SC_REST_API class from the main shopping system.
+
 = 1.3.1 - 2018-10-17 =
 * Add - Added SC Novo Mobile theme for the APM fields.
 

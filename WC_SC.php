@@ -6,17 +6,8 @@ if (!session_id()) {
 
 class WC_SC extends WC_Payment_Gateway
 {
-    # payments URLs
+    # payments URL
     private $URL = '';
-    
-    // Cashier URLs
-    private $liveurl    = 'https://secure.safecharge.com/ppp/purchase.do'; // live
-    private $testurl    = 'https://ppp-test.safecharge.com/ppp/purchase.do'; // test
-    
-    // REST API URLs
-    private $live_pay_apm_url = 'https://secure.safecharge.com/ppp/api/v1/paymentAPM.do'; // live
-    private $test_pay_apm_url = 'https://ppp-test.safecharge.com/ppp/api/v1/paymentAPM.do'; // test
-    # payments URLs END
     
     public function __construct()
     {
@@ -35,21 +26,19 @@ class WC_SC extends WC_Payment_Gateway
 
 		$this -> init_form_fields();
 		$this -> init_settings();
-
+        
 		$this -> title = $this -> settings['title'];
 		$this -> description = $this -> settings['description'];
 		$this -> merchant_id = $this -> settings['merchant_id'];
 		$this -> merchantsite_id = $this -> settings['merchantsite_id'];
         $this -> secret = $this -> settings['secret'];
 		$this -> test = $this -> settings['test'];
-	//	$this -> URL = $this -> settings['URL'];
 		$this -> show_thanks_msg = $this->settings['show_thanks_msg'];
 		$this -> show_thanks_msg = $this->settings['show_thanks_msg'];
 		$this -> hash_type = isset($this->settings['hash_type'])
-            ? $this->settings['hash_type'] : 'md5';
+            ? $this->settings['hash_type'] : 'sha256';
 		$this -> payment_api = isset($this->settings['payment_api'])
             ? $this->settings['payment_api'] : 'cashier';
-	//	$this -> load_payment_options = $this -> settings['load_payment_options'];
         
         # set session variables for future use, like when we get APMs for a country
         $_SESSION['SC_Variables']['merchant_id']        = $this->merchant_id;
@@ -254,7 +243,6 @@ class WC_SC extends WC_Payment_Gateway
         $params['items'] = array();
 		
         foreach ( $items as $item ) {
-        //   echo '<pre>'.print_r($item, true).'</pre>';
 			$params['item_name_'.$i]        = $item['name'];
 			$params['item_number_'.$i]      = $item['product_id'];
             $params['item_quantity_'.$i]    = $item['qty'];
@@ -419,11 +407,13 @@ class WC_SC extends WC_Payment_Gateway
         
         # Cashier payment
         if($this->payment_api == 'cashier') {
-            $params['checksum'] = hash($this->settigns['hash_type'], stripslashes($this->secret . $for_hash));
+            $params['checksum'] = hash($this->hash_type, stripslashes($this->secret . $for_hash));
             
             $params_array = array();
-            foreach($params as $key => $value){
-                $params_array[] = "<input type='hidden' name='$key' value='$value'/>";
+            foreach($params as $key => $value) {
+                if(!is_array($value)) {
+                    $params_array[] = "<input type='hidden' name='$key' value='$value'/>";
+                }
             }
 
             $this->create_log($params, 'Order params');
@@ -475,17 +465,14 @@ class WC_SC extends WC_Payment_Gateway
             );
                 
             $params['checksum'] = hash($this->settings['hash_type'], stripslashes(
-                $_SESSION['merchant_id']
-                .$_SESSION['merchantsite_id']
+                $_SESSION['SC_Variables']['merchant_id']
+                .$_SESSION['SC_Variables']['merchantsite_id']
                 .$params['client_request_id']
                 .$params['total_amount']
                 .$params['currency']
                 .$TimeStamp
                 .$this->secret
             ));
-            
-        //    echo '<h4>Session variables: </h4><pre>'.print_r($_SESSION['SC_Variables'], true).'</pre>';
-        //    echo '<h4>Payment parameters: </h4><pre>'.print_r($params, true).'</pre>';
             
             $this->create_log($_SESSION['SC_Variables'], 'SC_Variables: ');
             $this->create_log($params, 'params sent to REST: ');
@@ -494,7 +481,7 @@ class WC_SC extends WC_Payment_Gateway
             
             $rest_api = new SC_REST_API();
             // ALWAYS CHECK USED PARAMS IN process_payment
-            $resp = $rest_api->process_payment($params);
+            $resp = $rest_api->process_payment($params, $_SESSION['SC_Variables'], $_REQUEST['order-pay']);
             
             $this->create_log($resp, 'REST API response: ');
             $order_status = strtolower($order->get_status());
@@ -590,7 +577,6 @@ class WC_SC extends WC_Payment_Gateway
                 .'</script>';
             exit;
         }
-            
     }
     
 	 /**
@@ -638,7 +624,8 @@ class WC_SC extends WC_Payment_Gateway
      **/
     public function process_sc_notification()
     {
-        $this->create_log('', 'call process_sc_notification()');
+        $this->create_log($_REQUEST, 'call process_sc_notification()');
+        
 		try {
             // Cashier DMN
             if(@$_REQUEST['invoice_id'] !== '') {
@@ -739,27 +726,25 @@ class WC_SC extends WC_Payment_Gateway
 		if ($this->test == 'yes'){
             $this->use_session_token_url    = SC_TEST_SESSION_TOKEN_URL;
             $this->use_merch_paym_meth_url  = SC_TEST_REST_PAYMENT_METHODS_URL;
-            $this->use_pay_apm_url          = $this->live_pay_apm_url;
             
             // set payment URL
             if($this->payment_api == 'cashier') {
-                $this->URL = $this->testurl;
+                $this->URL = SC_TEST_CASHIER_URL;
             }
             elseif($this->payment_api == 'rest') {
-                $this->URL = $this->test_pay_apm_url;
+                $this->URL = SC_TEST_PAYMENT_URL;
             }
 		}
         else {
             $this->use_session_token_url    = SC_LIVE_SESSION_TOKEN_URL;
             $this->use_merch_paym_meth_url  = SC_LIVE_REST_PAYMENT_METHODS_URL;
-            $this->use_pay_apm_url          = $this->test_pay_apm_url;
             
             // set payment URL
             if($this->payment_api == 'cashier') {
-                $this->URL = $this->liveurl;
+                $this->URL = SC_LIVE_CASHIER_URL;
             }
             elseif($this->payment_api == 'rest') {
-                $this->URL = $this->live_pay_apm_url;
+                $this->URL = SC_LIVE_PAYMENT_URL;
             }
 		}
 	}
@@ -890,7 +875,7 @@ class WC_SC extends WC_Payment_Gateway
         }
         elseif(is_string($data)) {
         //    $d = mb_convert_encoding($data, 'UTF-8');
-            $d = '<pre>'.$d.'</pre>';
+            $d = '<pre>'.$data.'</pre>';
         }
         elseif(is_bool($data)) {
             $d = $data ? 'true' : 'false';
@@ -904,19 +889,19 @@ class WC_SC extends WC_Payment_Gateway
             $d = '<h3>'.$title.'</h3>'."\r\n".$d;
         }
         
-        try {
-            if(defined('SC_LOG_FILE_PATH')) {
+        if(defined('SC_LOG_FILE_PATH')) {
+            try {
                 file_put_contents(SC_LOG_FILE_PATH, date('H:i:s') . ': ' . $d."\r\n"."\r\n", FILE_APPEND);
             }
-        }
-        catch (Exception $exc) {
-            echo
-                '<script>'
-                    .'error.log("Log file was not created, by reason: '.$exc.'");'
-                    .'console.log("Log file was not created, by reason: '.$data.'");'
-                .'</script>';
-        }
 
+            catch (Exception $exc) {
+                echo
+                    '<script>'
+                        .'error.log("Log file was not created, by reason: '.$exc.'");'
+                        .'console.log("Log file was not created, by reason: '.$data.'");'
+                    .'</script>';
+            }
+        }
     }
 }
 

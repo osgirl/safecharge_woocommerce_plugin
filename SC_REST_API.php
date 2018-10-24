@@ -22,7 +22,6 @@ class SC_REST_API
     private $cpanel_url = '';
     // GW settings
     private $settings = array();
-    //private $notify_url = SC_NOTIFY_URL . 'Rest';
     
     /**
      * Function sc_refund_order
@@ -31,8 +30,10 @@ class SC_REST_API
      * @params array $settings - the GW settings
      * @params string $refund_json - system last refund data as json
      * @params array $order_meta_data - additional meta data for the order
+     * @params string $currency - used currency
+     * @params string $notify_url
      */
-    public function sc_refund_order(array $settings, $refund_json, array $order_meta_data)
+    public function sc_refund_order(array $settings, $refund_json, array $order_meta_data, $currency, $notify_url)
     {
         $this->settings = $settings;
         $refund = json_decode($refund_json, true);
@@ -46,17 +47,10 @@ class SC_REST_API
         }
         
         $time = date('YmdHis', time());
-        $ord_tr_id = $order_meta_data['order_tr_id'];
         
-        // at the moment with the REST API we do not recieve transaction ID,
-        // and we get empty string bleow
+        // order transaction ID
+        $ord_tr_id = $order_meta_data['order_tr_id'];
         if(!$ord_tr_id || empty($ord_tr_id)) {
-            $note = __();
-            $order -> add_order_note(__($note, 'sc'));
-            $order->save();
-            
-            wp_send_json_success();
-            
             return 'The Order does not have Transaction ID. Refund can not procceed.';
         }
         
@@ -66,16 +60,16 @@ class SC_REST_API
             'clientRequestId'       => $time . '_' . $ord_tr_id,
             'clientUniqueId'        => $ord_tr_id,
             'amount'                => number_format($refund['data']['amount'], 2),
-            'currency'              => get_woocommerce_currency(),
+            'currency'              => $currency,
             'relatedTransactionId'  => $ord_tr_id, // GW Transaction ID
-            'authCode'              => $order->get_meta(SC_AUTH_CODE_KEY),
+            'authCode'              => $order_meta_data['auth_code'],
             'comment'               => $refund['data']['reason'], // optional
-            'url'                   => $this->notify_url,
+            'url'                   => $notify_url,
             'timeStamp'             => $time,
         );
         
         $other_params = array(
-            'urlDetails'            => array('notificationUrl' => $this->notify_url),
+            'urlDetails'            => array('notificationUrl' => $notify_url),
         );
         
         $this->create_log($ref_parameters, 'refund_parameters: ');
@@ -90,16 +84,12 @@ class SC_REST_API
         );
         
         $note = '';
-        $error_note = 'Please check your e-mail for details and manually delete request Refund #'
-            .$refund['id'].' form the order or login into '. $this->cpanel_url
-            .' and refund Transaction ID '.$ord_tr_id;
+        $error_note = 'Please manually delete request Refund #'
+            .$refund['id'].' form the order or login into <i>'. $this->cpanel_url
+            .'</i> and refund Transaction ID '.$ord_tr_id;
         
         if($json_arr === false){
-            $note = __('The REST API retun false. '.$error_note, 'sc');
-            $order -> add_order_note(__($note, 'sc'));
-            $order->save();
-            
-            wp_send_json_success();
+            return 'The REST API retun false. ' . $error_note;
         }
         
         if(!is_array($json_arr)) {
@@ -107,22 +97,14 @@ class SC_REST_API
         }
 
         if(!is_array($json_arr)) {
-            $note =  __('Invalid API response. '.$error_note, 'sc');
-            $order -> add_order_note(__($note, 'sc'));
-            $order->save();
-            
-            wp_send_json_success();
+            return 'Invalid API response. ' . $error_note;
         }
         
         $this->create_log($json_arr, 'json_arr: ');
         
         // the status of the request
         if(isset($json_arr['status']) && $json_arr['status'] == 'ERROR') {
-            $note = __('Error, Invalid checksum. '.$error_note, 'sc');
-            $order -> add_order_note(__($note, 'sc'));
-            $order->save();
-            
-            wp_send_json_success();
+            return 'Error, Invalid checksum. ' . $error_note;
         }
         
         // check the transaction status
@@ -137,23 +119,17 @@ class SC_REST_API
                 $note = 'Transaction error';
             }
             
-            $order -> add_order_note(__($note.'. '.$error_note, 'sc'));
-            $order->save();
-            
-            wp_send_json_success();
+            return $note. '. ' .$error_note;
         }
         
         // create refund note
-        $note = 'Your request - Refund #' . $refund['id'] . ', was successful.';
-        $order -> add_order_note(__($note, 'sc'));
-        $order->save();
-        
-        wp_send_json_success();
+        return 'Your request - Refund #' . $refund['id'] . ', was successful.';
     }
     
     /**
      * Function call_rest_api
      * Call REST API with cURL post and get response.
+     * The URL depends from the case.
      * 
      * @param type $url - API URL
      * @param array $checksum_params - parameters we use for checksum
@@ -220,15 +196,11 @@ class SC_REST_API
      * Function get_rest_apms
      * Get REST API APMs by passed data.
      * 
-     * @param array $data - session data
-     * @return array
+     * @param array $data - session data, or other passed data
+     * @return string - json
      */
     public function get_rest_apms($data = array())
     {
-        require_once 'sc_config.php';
-        
-        $this->create_log($data, 'Params for Session Token: ');
-        
         // getSessionToken
         $session_token_data = $this->get_session_token($data);
         $session_token = $session_token_data['sessionToken'];
@@ -249,9 +221,9 @@ class SC_REST_API
 
         $other_params = array(
             'sessionToken'      => $session_token,
-            'currencyCode'      => $data['currencyCode'], // optional
-            'countryCode'       => $data['sc_country'], // optional
-            'languageCode'      => $data['languageCode'], // optional
+            'currencyCode'      => $data['currencyCode'],
+            'countryCode'       => $data['sc_country'],
+            'languageCode'      => $data['languageCode'],
             'type'              => '', // optional
         );
 
@@ -273,25 +245,29 @@ class SC_REST_API
      * Function process_payment
      * 
      * @param array $data
+     * @param array $sc_variables
+     * @param string $order_pay
+     * 
      * @return array|bool
      */
-    public function process_payment($data)
+    public function process_payment($data, $sc_variables, $order_pay)
     {
-        $this->apm_payment_url = $this->test_apm_payment_url;
-        if($_SESSION['SC_Variables']['test'] == 'no') {
-            $this->apm_payment_url = $this->live_apm_payment_url;
+        $this->apm_payment_url = SC_TEST_PAYMENT_URL;
+        if($sc_variables['test'] == 'no') {
+            $this->apm_payment_url = SC_LIVE_PAYMENT_URL;
         }
         
-        $session_token = $this->get_session_token($data);
+        $session_token_data = $this->get_session_token($sc_variables);
+        $session_token = $session_token_data['sessionToken'];
         $time = date('YmdHis', time());
         
+        // some optional parameters are not included
         $params = array(
             'sessionToken'      => $session_token,
-        //    'orderId'         => $session_token, // optional
-            'merchantId'        => $_SESSION['SC_Variables']['merchant_id'],
-            'merchantSiteId'    => $_SESSION['SC_Variables']['merchantsite_id'],
+            'merchantId'        => $sc_variables['merchant_id'],
+            'merchantSiteId'    => $sc_variables['merchantsite_id'],
             'userTokenId'       => '', // optional - ID of the user in the merchant’s system.
-            'clientUniqueId'    => $_REQUEST['order-pay'],
+            'clientUniqueId'    => $order_pay,
             'clientRequestId'   => $data['client_request_id'],
             'currency'          => $data['currency'],
             'amount'            => (string) $data['total_amount'],
@@ -302,42 +278,34 @@ class SC_REST_API
                 'totalTax'          => $data['total_tax'],
             ),
             'items'             => $data['items'],
-        //    'deviceDetails'     => '', // optionals
             'userDetails'       => array(
-                'firstName'         => $data['first_name'],
-                'lastName'          => $data['last_name'],
-                'address'           => $data['address1'],
-                'phone'             => $data['phone1'],
-                'zip'               => $data['zip'],
-                'city'              => $data['city'],
-                'country'           => $data['country'],
-                'state'             => '', // ????
-                'email'             => $data['email'],
-                'county'            => '',
+                'firstName'             => $data['first_name'],
+                'lastName'              => $data['last_name'],
+                'address'               => $data['address1'],
+                'phone'                 => $data['phone1'],
+                'zip'                   => $data['zip'],
+                'city'                  => $data['city'],
+                'country'               => $data['country'],
+                'state'                 => '', // ????
+                'email'                 => $data['email'],
+                'county'                => '',
             ),
             'shippingAddress'   => array(
-                'firstName'         => $data['shippingFirstName'],
-                'lastName'          => $data['shippingLastName'],
-                'address'           => $data['shippingAddress'],
-                'cell'              => '',
-                'phone'             => '',
-                'zip'               => $data['shippingZip'],
-                'city'              => $data['shippingCity'],
-                'country'           => $data['shippingCountry'],
-                'state'             => '',
-                'email'             => '',
-                'shippingCounty'    => $data['shippingCountry'],
+                'firstName'             => $data['shippingFirstName'],
+                'lastName'              => $data['shippingLastName'],
+                'address'               => $data['shippingAddress'],
+                'cell'                  => '',
+                'phone'                 => '',
+                'zip'                   => $data['shippingZip'],
+                'city'                  => $data['shippingCity'],
+                'country'               => $data['shippingCountry'],
+                'state'                 => '',
+                'email'                 => '',
+                'shippingCounty'        => $data['shippingCountry'],
             ),
-        //    'billingAddress'        => array(), // optional
-        //    'dynamicDescriptor'     => array(), // optional
-        //    'merchantDetails'       => array(), // optional
-        //    'addendums'             => array(), // optional
-            'paymentMethod'         => $_SESSION['SC_Variables']['APM_data']['payment_method'],
-        //    'userAccountDetails'    => '', // optional
-        //    'userPaymentOption'     => array(), // optional
+            'paymentMethod'         => $sc_variables['APM_data']['payment_method'],
             'urlDetails'            => $data['urlDetails'],
-        //    'subMethodDetails'      => array(), // optional
-            'timeStamp'             => current(explode('_', $_SESSION['SC_Variables']['cri2'])),
+            'timeStamp'             => current(explode('_', $sc_variables['cri2'])),
             'checksum'              => $data['checksum'],
         );
         
@@ -349,8 +317,6 @@ class SC_REST_API
             array(),
             $data['checksum']
         );
-        
-    //    echo '<h4>Payment APM resp: </h4><pre>'.print_r($resp, true).'</pre>';
         
         if(!is_array(@$resp)) {
             return false;
@@ -368,27 +334,27 @@ class SC_REST_API
      */
     private function get_session_token($data)
     {
-        if(!isset($_SESSION['SC_Variables']['merchant_id'], $_SESSION['SC_Variables']['merchantsite_id'])) {
-            $this->create_log('', 'No session variables. ');
+        if(!isset($data['merchant_id'], $data['merchantsite_id'])) {
+            $this->create_log($data, 'No session variables: ');
             return false;
         }
         
         $time = date('YmdHis', time());
 
         $params = array(
-            'merchantId'        => $_SESSION['SC_Variables']['merchant_id'],
-            'merchantSiteId'    => $_SESSION['SC_Variables']['merchantsite_id'],
-            'clientRequestId'   => $_SESSION['SC_Variables']['cri1'],
-            'timeStamp'         => current(explode('_', $_SESSION['SC_Variables']['cri1'])),
+            'merchantId'        => $data['merchant_id'],
+            'merchantSiteId'    => $data['merchantsite_id'],
+            'clientRequestId'   => $data['cri1'],
+            'timeStamp'         => current(explode('_', $data['cri1'])),
         );
 
         $resp_arr = $this->call_rest_api(
-            $_SESSION['SC_Variables']['test'] == 'yes' ? SC_TEST_SESSION_TOKEN_URL : SC_LIVE_SESSION_TOKEN_URL,
+            $data['test'] == 'yes' ? SC_TEST_SESSION_TOKEN_URL : SC_LIVE_SESSION_TOKEN_URL,
             $params,
             '',
             '',
             array(),
-            $_SESSION['SC_Variables']['cs1']
+            $data['cs1']
         );
         
         if(
@@ -414,7 +380,7 @@ class SC_REST_API
      */
     private function create_log($data, $title = '')
     {
-        if(!defined('WP_DEBUG') || WP_DEBUG === false) {
+        if(!defined('SC_DEBUG') || SC_DEBUG === false) {
             return;
         }
         
@@ -427,7 +393,7 @@ class SC_REST_API
         }
         elseif(is_string($data)) {
         //    $d = mb_convert_encoding($data, 'UTF-8');
-            $d = '<pre>'.$d.'</pre>';
+            $d = '<pre>'.$data.'</pre>';
         }
         elseif(is_bool($data)) {
             $d = $data ? 'true' : 'false';
@@ -441,19 +407,19 @@ class SC_REST_API
             $d = '<h3>'.$title.'</h3>'."\r\n".$d;
         }
         
-        try {
-            if(defined('SC_LOG_FILE_PATH')) {
+        if(defined('SC_LOG_FILE_PATH')) {
+            try {
                 file_put_contents(SC_LOG_FILE_PATH, date('H:i:s') . ': ' . $d."\r\n"."\r\n", FILE_APPEND);
             }
-        }
-        catch (Exception $exc) {
-            echo
-                '<script>'
-                    .'error.log("Log file was not created, by reason: '.$exc.'");'
-                    .'console.log("Log file was not created, by reason: '.$data.'");'
-                .'</script>';
-        }
 
+            catch (Exception $exc) {
+                echo
+                    '<script>'
+                        .'error.log("Log file was not created, by reason: '.$exc.'");'
+                        .'console.log("Log file was not created, by reason: '.$data.'");'
+                    .'</script>';
+            }
+        }
     }
 }
 
