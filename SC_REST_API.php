@@ -197,9 +197,11 @@ class SC_REST_API
      * Get REST API APMs by passed data.
      * 
      * @param array $data - session data, or other passed data
+     * @param bool $is_ajax - is ajax call, after country changed
+     * 
      * @return string - json
      */
-    public function get_rest_apms($data = array())
+    public function get_rest_apms($data = array(), $is_ajax = false)
     {
         // getSessionToken
         $session_token_data = $this->get_session_token($data);
@@ -208,10 +210,7 @@ class SC_REST_API
         if(!$session_token) {
             $this->create_log('', 'Session Token is FALSE.');
             
-            if(
-                isset($_SERVER['HTTP_X_REQUESTED_WITH'])
-                && $_SERVER['HTTP_X_REQUESTED_WITH'] == 'XMLHttpRequest'
-            ) {
+            if($is_ajax) {
                 echo json_encode(array('status' => 0));
                 exit;
             }
@@ -244,10 +243,7 @@ class SC_REST_API
             $data['cs2']
         );
         
-        if(
-            isset($_SERVER['HTTP_X_REQUESTED_WITH'])
-            && $_SERVER['HTTP_X_REQUESTED_WITH'] == 'XMLHttpRequest'
-        ) {
+        if($is_ajax) {
             echo json_encode(array('status' => 1, 'data' => $resp_arr));
             exit;
         }
