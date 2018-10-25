@@ -460,13 +460,13 @@ if(
     // if the Country come as POST variable
     if(!empty($_SESSION['SC_Variables']['sc_country'])) {
         $apms_getter = new SC_REST_API();
-        $apms_getter->get_rest_apms($_SESSION['SC_Variables']);
+        $apms_getter->get_rest_apms($_SESSION['SC_Variables'], true);
     }
     // WC calls this method twice, so we want to get APMs only on first call
     else {
         $_SESSION['SC_Variables']['sc_country'] = $_POST['country'];
         
         $apms_getter = new SC_REST_API();
-        $apms_getter->get_rest_apms($_SESSION['SC_Variables']);
+        $apms_getter->get_rest_apms($_SESSION['SC_Variables'], true);
     }
 }

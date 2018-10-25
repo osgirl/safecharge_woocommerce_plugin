@@ -119,13 +119,9 @@ jQuery(function() {
                                     pattern = 'pattern="'+ pMethods[i].fields[j].regex +'"';
                                 }
 
-                                if(typeof pMethods[i].fields[j].validationmessage != 'undefined') {
-                                    fieldErrorMsg = pMethods[i].fields[j].validationmessage[0].message;
-                                }
-                                
                                 html +=
                                         '<div class="apm_field">'
-                                            +'<input id="'+ pMethods[i].fields[j].name +'" name="'+ pMethods[i].paymentMethod +'['+ pMethods[i].fields[j].name +']" type="'+ pMethods[i].fields[j].type +'" '+ pattern + ' '+ fieldErrorMsg +' placeholder="'+ pMethods[i].fields[j].caption[0].message +'" autocomplete="new-password" />';
+                                            +'<input id="'+ pMethods[i].fields[j].name +'" name="'+ pMethods[i].paymentMethod +'['+ pMethods[i].fields[j].name +']" type="'+ pMethods[i].fields[j].type +'" '+ pattern + ' placeholder="'+ pMethods[i].fields[j].caption[0].message +'" autocomplete="new-password" />';
                                     
                                 if(pattern != '') {
                                     html +=
