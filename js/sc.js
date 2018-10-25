@@ -125,12 +125,8 @@ jQuery(function() {
                                     
                                 if(pattern != '') {
                                     html +=
-                                            '<span class="question_mark" onclick="showErrorLikeInfo(\'sc_'+ pMethods[i].fields[j].name +'\')"><span class="tooltip-icon"></span></span>';
-                                }
-                                
-                                if(pattern != '') {
-                                    html +=
-                                            '<div class="apm_error" id="error_sc_'+ pMethods[i].fields[j].name +'">'
+                                            '<span class="question_mark" onclick="showErrorLikeInfo(\'sc_'+ pMethods[i].fields[j].name +'\')"><span class="tooltip-icon"></span></span>'
+                                            +'<div class="apm_error" id="error_sc_'+ pMethods[i].fields[j].name +'">'
                                                 +'<label>'+fieldErrorMsg+'</label>'
                                             +'</div>';
                                 }
