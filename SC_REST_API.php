@@ -207,8 +207,16 @@ class SC_REST_API
         
         if(!$session_token) {
             $this->create_log('', 'Session Token is FALSE.');
-            echo json_encode(array('status' => 0));
-            exit;
+            
+            if(
+                isset($_SERVER['HTTP_X_REQUESTED_WITH'])
+                && $_SERVER['HTTP_X_REQUESTED_WITH'] == 'XMLHttpRequest'
+            ) {
+                echo json_encode(array('status' => 0));
+                exit;
+            }
+            
+            return json_encode(array('status' => 0));
         }
         
         # get merchant payment methods
@@ -236,8 +244,15 @@ class SC_REST_API
             $data['cs2']
         );
         
-        echo json_encode(array('status' => 1, 'data' => $resp_arr));
-        exit;
+        if(
+            isset($_SERVER['HTTP_X_REQUESTED_WITH'])
+            && $_SERVER['HTTP_X_REQUESTED_WITH'] == 'XMLHttpRequest'
+        ) {
+            echo json_encode(array('status' => 1, 'data' => $resp_arr));
+            exit;
+        }
+
+        return json_encode(array('status' => 1, 'data' => $resp_arr));
         # get merchant payment methods END
     }
     
@@ -424,6 +439,7 @@ class SC_REST_API
 }
 
 // work with Ajax when change country from the select menu manually
+// The following fileds are MANDATORY for success
 if(
     isset(
         $_SERVER['HTTP_X_REQUESTED_WITH']
