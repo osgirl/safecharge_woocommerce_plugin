@@ -261,7 +261,7 @@ class SC_REST_API
      * 
      * @return array|bool
      */
-    public function process_payment($data, $sc_variables, $order_pay)
+    public function process_payment($data, $sc_variables, $order_pay = '')
     {
         $this->apm_payment_url = SC_TEST_PAYMENT_URL;
         if($sc_variables['test'] == 'no') {
