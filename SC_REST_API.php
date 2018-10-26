@@ -257,11 +257,11 @@ class SC_REST_API
      * 
      * @param array $data
      * @param array $sc_variables
-     * @param string $order_pay
+     * @param string $order_id
      * 
      * @return array|bool
      */
-    public function process_payment($data, $sc_variables, $order_pay = '')
+    public function process_payment($data, $sc_variables, $order_id = '')
     {
         $this->apm_payment_url = SC_TEST_PAYMENT_URL;
         if($sc_variables['test'] == 'no') {
@@ -278,12 +278,12 @@ class SC_REST_API
             'merchantId'        => $sc_variables['merchant_id'],
             'merchantSiteId'    => $sc_variables['merchantsite_id'],
             'userTokenId'       => '', // optional - ID of the user in the merchant’s system.
-            'clientUniqueId'    => $order_pay,
+            'clientUniqueId'    => $order_id,
             'clientRequestId'   => $data['client_request_id'],
             'currency'          => $data['currency'],
             'amount'            => (string) $data['total_amount'],
             'amountDetails'     => array(
-                'totalShipping'     => 0, // ?
+                'totalShipping'     => '0.00', // ?
                 'totalHandling'     => $data['handling'], // this is actually shipping
                 'totalDiscount'     => $data['discount'],
                 'totalTax'          => $data['total_tax'],
