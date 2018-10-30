@@ -101,8 +101,11 @@ jQuery(function() {
                             var newImg = pMethods[i]['logoURL'].replace('/svg/', '/svg/solid-white/');
                             var pmMsg = '';
                             
-                            if(typeof pMethods[i]['paymentMethodDisplayName'][0]['message'] != 'undefined') {
-                                pmMsg = pMethods[i]['paymentMethodDisplayName'][0]['message'];
+                            if(
+                                pMethods[i]['paymentMethodDisplayName'].length > 0
+                                && typeof pMethods[i]['paymentMethodDisplayName'][0].message != 'undefined'
+                            ) {
+                                pmMsg = pMethods[i]['paymentMethodDisplayName'][0].message;
                             }
                             
                             html +=
