@@ -228,7 +228,7 @@ class WC_SC extends WC_Payment_Gateway
         $cust_fields = $order->get_meta_data();
         $cust_fields2 = get_post_meta($order_id, 'payment_method_sc', true);
         
-        $this->create_log($order, "the order data: ");
+    //    $this->create_log($order, "the order data: ");
         
         $order->add_order_note("User is redicted to ".SC_GATEWAY_TITLE." Payment page.");
         $order->save();
@@ -476,6 +476,18 @@ class WC_SC extends WC_Payment_Gateway
             
             $this->create_log($_SESSION['SC_Variables'], 'SC_Variables: ');
             $this->create_log($params, 'params sent to REST: ');
+            $this->create_log($this->settings['hash_type'], 'Hash type: ');
+            $this->create_log(
+                $_SESSION['SC_Variables']['merchant_id']
+                    .$_SESSION['SC_Variables']['merchantsite_id']
+                    .$params['client_request_id']
+                    .$params['total_amount']
+                    .$params['currency']
+                    .$TimeStamp
+                    .$this->secret, 
+                'Checksum params: '
+            );
+            $this->create_log($params['checksum'], 'The Checksum: ');
             
             require_once 'SC_REST_API.php';
             

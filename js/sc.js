@@ -99,11 +99,16 @@ jQuery(function() {
 
                         for(var i in pMethods) {
                             var newImg = pMethods[i]['logoURL'].replace('/svg/', '/svg/solid-white/');
+                            var pmMsg = '';
+                            
+                            if(typeof pMethods[i]['paymentMethodDisplayName'][0]['message'] != 'undefined') {
+                                pmMsg = pMethods[i]['paymentMethodDisplayName'][0]['message'];
+                            }
                             
                             html +=
                                 '<li class="apm_container">'
                                     +'<div class="apm_title">'
-                                        +'<img src="'+ newImg +'" alt="'+pMethods[i]['paymentMethodDisplayName'][0]['message']+'">'
+                                        +'<img src="'+ newImg +'" alt="'+ pmMsg +'">'
                                         +'<input id="sc_payment_method_'+ pMethods[i].paymentMethod +'" type="radio" class="input-radio sc_payment_method_field" name="payment_method_sc" value="'+ pMethods[i].paymentMethod +'" />'
                                         +'<span class=""></span>'
                                     +'</div>'

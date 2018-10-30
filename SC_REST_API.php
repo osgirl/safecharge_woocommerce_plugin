@@ -233,6 +233,8 @@ class SC_REST_API
             'languageCode'      => $data['languageCode'],
             'type'              => '', // optional
         );
+        
+        $this->create_log('', 'Call REST API to get REST APMs: ');
 
         $resp_arr = $this->call_rest_api(
             $data['test'] == 'yes' ? SC_TEST_REST_PAYMENT_METHODS_URL : SC_LIVE_REST_PAYMENT_METHODS_URL,
@@ -320,6 +322,9 @@ class SC_REST_API
             'checksum'              => $data['checksum'],
         );
         
+        $this->create_log(json_encode($params), 'Call REST API when Process Payment: ');
+    //    $this->create_log($data['checksum'], 'Checksum went to REST: ');
+        
         $resp = $this->call_rest_api(
             $this->apm_payment_url,
             $params,
@@ -359,6 +364,8 @@ class SC_REST_API
             'timeStamp'         => current(explode('_', $data['cri1'])),
         );
 
+        $this->create_log('', 'Call REST API for Session Token: ');
+        
         $resp_arr = $this->call_rest_api(
             $data['test'] == 'yes' ? SC_TEST_SESSION_TOKEN_URL : SC_LIVE_SESSION_TOKEN_URL,
             $params,
