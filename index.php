@@ -94,6 +94,10 @@ function sc_enqueue($hook)
     // novo style
     wp_register_style ('novo_style', WP_PLUGIN_URL. '/'. $plugin_dir. '/css/novo.css', '' , '', 'all' );
     wp_enqueue_style( 'novo_style' );
+    
+    // SC Tkenization script
+//    wp_register_script("sc_token_js", 'https://cdn.safecharge.com/js/v1/safecharge.js', array('jquery') );
+//    wp_enqueue_script( 'sc_token_js' );
     # load external files END
 }
 

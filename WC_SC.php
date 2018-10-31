@@ -647,12 +647,14 @@ class WC_SC extends WC_Payment_Gateway
 
                 if ($order){
                     $verified = false;
-                    // md5sig validation
+                    // hash validation
                     if ($this->secret) {
-                        $hash  =  $this->secret . $_REQUEST['ppp_status'] . $_REQUEST['PPP_TransactionID'];
-                        $md5hash = md5($hash);
-                        $md5sig = $_REQUEST['responsechecksum'];
-                        if ($md5hash == $md5sig) {
+                        $hash = hash(
+                            $this->hash_type,
+                            $this->secret . $_REQUEST['ppp_status'] . $_REQUEST['PPP_TransactionID']
+                        );
+                        
+                        if ($hash == $_REQUEST['responsechecksum']) {
                             $verified = true;
                         }
                     }
@@ -672,7 +674,7 @@ class WC_SC extends WC_Payment_Gateway
                 }
                 else {
                     $this -> msg['class'] = 'error';
-                    $this -> msg['message'] = "Security Error. Illegal access detected";
+                    $this -> msg['message'] = "Security Error. Checksum validation faild.";
                     $order -> update_status('failed');
                     $order -> add_order_note('Failed');
                     $order -> add_order_note($this->msg['message']);
@@ -719,11 +721,14 @@ class WC_SC extends WC_Payment_Gateway
 
 	public function checkAdvancedCheckSum()
     {
-        if (isset($_GET['advanceResponseChecksum'])){
-            $str = md5($this->secret.$_GET['totalAmount'].$_GET['currency']
-                .$_GET['responseTimeStamp'] . $_GET['PPP_TransactionID']
-                .$_GET['Status'] . $_GET['productId']);
-
+        if (isset($_GET['advanceResponseChecksum'])) {
+            $str = hash(
+                $this->hash_type,
+                $this->secret.$_GET['totalAmount'].$_GET['currency']
+                    .$_GET['responseTimeStamp'] . $_GET['PPP_TransactionID']
+                    .$_GET['Status'] . $_GET['productId']
+            );
+                
             if ($str == $_GET['advanceResponseChecksum'])
                 return true;
             else
