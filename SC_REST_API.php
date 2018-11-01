@@ -208,14 +208,20 @@ class SC_REST_API
         $session_token = $session_token_data['sessionToken'];
         
         if(!$session_token) {
-            $this->create_log('', 'Session Token is FALSE.');
+            $this->create_log($session_token, 'Session Token is FALSE.');
             
             if($is_ajax) {
-                echo json_encode(array('status' => 0));
+                echo json_encode(array(
+                    'status' => 0,
+                    'msg' => 'No Session Token',
+                    'data' => $data,
+                    'ses_t_data' => json_encode($session_token),
+                    'token' => $session_token)
+                );
                 exit;
             }
             
-            return json_encode(array('status' => 0));
+            return json_encode(array('status' => 0, 'msg' => 'No Session Token'));
         }
         
         # get merchant payment methods
@@ -364,7 +370,7 @@ class SC_REST_API
             'timeStamp'         => current(explode('_', $data['cri1'])),
         );
 
-        $this->create_log('', 'Call REST API for Session Token: ');
+        $this->create_log($params, 'Call REST API for Session Token $params: ');
         
         $resp_arr = $this->call_rest_api(
             $data['test'] == 'yes' ? SC_TEST_SESSION_TOKEN_URL : SC_LIVE_SESSION_TOKEN_URL,
@@ -381,6 +387,9 @@ class SC_REST_API
             || !isset($resp_arr['status'])
             || $resp_arr['status'] != 'SUCCESS'
         ) {
+        //    echo json_encode($data['test'] == 'yes' ? SC_TEST_SESSION_TOKEN_URL : SC_LIVE_SESSION_TOKEN_URL);
+        //    echo 'params: '.json_encode($params);
+        //    echo json_encode($resp_arr);
             $this->create_log($resp_arr, 'getting getSessionToken error: ');
             return false;
         }

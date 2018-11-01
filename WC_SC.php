@@ -416,6 +416,10 @@ class WC_SC extends WC_Payment_Gateway
                 }
             }
 
+            $this->create_log($this->URL, 'Endpoint URL: ');
+            $this->create_log($this->secret, 'Secret: ');
+            $this->create_log($for_hash, '$for_hash: ');
+            $this->create_log($this->hash_type, '$this->hash_type: ');
             $this->create_log($params, 'Order params');
 
             $html =

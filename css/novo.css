@@ -15,6 +15,8 @@ div.payment_method_sc {
 
 #sc_apms_list {
     box-shadow: 0 2px 4px 0 rgba(0,0,0,0.19);
+    width: 100%;
+    margin: 1em 0 1.4em 0;
 }
 
 .apm_container {
@@ -30,6 +32,10 @@ div.payment_method_sc {
     padding-left: 0.7em;
     padding-bottom: 0.5em;
     position: relative;
+}
+
+.apm_title img {
+    float: none !important;
 }
 
 .apm_fields {
@@ -66,6 +72,7 @@ div.payment_method_sc {
     padding-bottom: 8px !important;
     padding-left: 0px !important;
     padding-right: 0px !important;
+    width: 100%;
 }
 
 /* Chrome, Firefox, Opera, Safari 10.1+ */
@@ -121,7 +128,7 @@ div.payment_method_sc {
 /* fixes for last field borders END */
 
 .sc_payment_method_field {
-    visibility: hidden;
+    display: none;
 }
 
 .apm_title .apm_selected {

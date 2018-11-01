@@ -98,9 +98,12 @@ jQuery(function() {
                             '<ul id="sc_apms_list">';
 
                         for(var i in pMethods) {
-                            var newImg = pMethods[i]['logoURL'].replace('/svg/', '/svg/solid-white/');
-                            var pmMsg = '';
+                            var newImg = '#';
+                            if(typeof pMethods[i]['logoURL'] != 'undefined') {
+                                var newImg = pMethods[i]['logoURL'].replace('/svg/', '/svg/solid-white/');
+                            }
                             
+                            var pmMsg = '';
                             if(
                                 pMethods[i]['paymentMethodDisplayName'].length > 0
                                 && typeof pMethods[i]['paymentMethodDisplayName'][0].message != 'undefined'
@@ -119,28 +122,44 @@ jQuery(function() {
                                     +'<div class="apm_fields">';
                             
                             // create fields for the APM
-                            for(var j in pMethods[i].fields) {
-                                var pattern = '';
-                                var fieldErrorMsg = '';
+                            if(pMethods[i].fields.length > 0) {
+                                for(var j in pMethods[i].fields) {
+                                    try {
+                                        var pattern = 'pattern="'+ pMethods[i].fields[j].regex +'"';
+                                    }
+                                    catch(e) {
+                                        var pattern = '';
+                                    }
 
-                                if(typeof pMethods[i].fields[j].regex != 'undefined') {
-                                    pattern = 'pattern="'+ pMethods[i].fields[j].regex +'"';
-                                }
-
-                                html +=
-                                        '<div class="apm_field">'
-                                            +'<input id="'+ pMethods[i].fields[j].name +'" name="'+ pMethods[i].paymentMethod +'['+ pMethods[i].fields[j].name +']" type="'+ pMethods[i].fields[j].type +'" '+ pattern + ' placeholder="'+ pMethods[i].fields[j].caption[0].message +'" autocomplete="new-password" />';
+                                    try {
+                                        var placeholder = pMethods[i].fields[j].caption[0].message;
+                                    }
+                                    catch(e) {
+                                        var placeholder = '';
+                                    }
                                     
-                                if(pattern != '') {
+                                    try {
+                                        var fieldErrorMsg = pMethods[i].fields[j].validationmessage[0].message;
+                                    }
+                                    catch(e) {
+                                        var fieldErrorMsg = '';
+                                    }
+
                                     html +=
-                                            '<span class="question_mark" onclick="showErrorLikeInfo(\'sc_'+ pMethods[i].fields[j].name +'\')"><span class="tooltip-icon"></span></span>'
-                                            +'<div class="apm_error" id="error_sc_'+ pMethods[i].fields[j].name +'">'
-                                                +'<label>'+fieldErrorMsg+'</label>'
-                                            +'</div>';
+                                            '<div class="apm_field">'
+                                                +'<input id="'+ pMethods[i].fields[j].name +'" name="'+ pMethods[i].paymentMethod +'['+ pMethods[i].fields[j].name +']" type="'+ pMethods[i].fields[j].type +'" '+ pattern + ' placeholder="'+ placeholder +'" autocomplete="new-password" />';
+
+                                    if(pattern != '') {
+                                        html +=
+                                                '<span class="question_mark" onclick="showErrorLikeInfo(\'sc_'+ pMethods[i].fields[j].name +'\')"><span class="tooltip-icon"></span></span>'
+                                                +'<div class="apm_error" id="error_sc_'+ pMethods[i].fields[j].name +'">'
+                                                    +'<label>'+fieldErrorMsg+'</label>'
+                                                +'</div>';
+                                    }
+
+                                    html +=
+                                            '</div>';
                                 }
-                                
-                                html +=
-                                        '</div>';
                             }
                                 
                             html +=

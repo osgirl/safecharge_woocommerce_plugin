@@ -126,7 +126,10 @@ function sc_show_final_text()
         $order_id  = $arr[0];
         $order = new WC_Order($order_id);
         
-        if ( strtolower($_REQUEST['ppp_status']) == 'failed' ) {
+        if (
+            strtolower($_REQUEST['ppp_status']) == 'failed'
+            || strtolower($_REQUEST['ppp_status']) == 'fail'
+        ) {
             $order -> add_order_note('User order failed.');
             $msg = __("Your payment failed. Please, try again.", 'sc');
         }
