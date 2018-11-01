@@ -570,9 +570,6 @@ class WC_SC extends WC_Payment_Gateway
             }
             $order->save();
             
-            // send order email manually
-        //    WC()->mailer()->emails['WC_Email_Customer_Processing_Order']->trigger($order_id);
-            
             echo 
                 '<script>'
                     .'window.location.href = "'

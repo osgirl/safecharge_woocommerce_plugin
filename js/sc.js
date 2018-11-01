@@ -66,6 +66,7 @@ jQuery(function() {
     var billing_country_first_val = jQuery("#billing_country").val();
     
     jQuery("#billing_country").change(function() {
+        console.log('billing_country change')
         if(jQuery("#billing_country").val() != billing_country_first_val) {
             manualChangedCountry = true;
             billing_country_first_val = jQuery("#billing_country").val();
@@ -91,6 +92,11 @@ jQuery(function() {
                         && typeof resp.data['paymentMethods'] != 'undefined'
                         && resp.data['paymentMethods'].length > 0
                     ) {
+                        // load SC script
+                        jQuery.getScript('https://cdn.safecharge.com/js/v1/safecharge.js');
+                        // call it like this:
+                        // Safecharge.card.createToken(payload, safechargeResultHandler);
+                        
                         var html = '';
                         var pMethods = resp.data['paymentMethods'];
                         
@@ -125,31 +131,31 @@ jQuery(function() {
                             if(pMethods[i].fields.length > 0) {
                                 for(var j in pMethods[i].fields) {
                                     try {
-                                        var pattern = 'pattern="'+ pMethods[i].fields[j].regex +'"';
+                                        var pattern = pMethods[i].fields[j].regex;
                                     }
-                                    catch(e) {
-                                        var pattern = '';
-                                    }
+                                    catch(e) {}
 
                                     try {
                                         var placeholder = pMethods[i].fields[j].caption[0].message;
+                                        if(placeholder == 'undefined') {
+                                            placeholder = '';
+                                        }
                                     }
-                                    catch(e) {
-                                        var placeholder = '';
-                                    }
+                                    catch(e) {}
                                     
                                     try {
                                         var fieldErrorMsg = pMethods[i].fields[j].validationmessage[0].message;
+                                        if(fieldErrorMsg == 'undefined') {
+                                            fieldErrorMsg = '';
+                                        }
                                     }
-                                    catch(e) {
-                                        var fieldErrorMsg = '';
-                                    }
+                                    catch(e) {}
 
                                     html +=
                                             '<div class="apm_field">'
-                                                +'<input id="'+ pMethods[i].fields[j].name +'" name="'+ pMethods[i].paymentMethod +'['+ pMethods[i].fields[j].name +']" type="'+ pMethods[i].fields[j].type +'" '+ pattern + ' placeholder="'+ placeholder +'" autocomplete="new-password" />';
+                                                +'<input id="'+ pMethods[i].fields[j].name +'" name="'+ pMethods[i].paymentMethod +'['+ pMethods[i].fields[j].name +']" type="'+ pMethods[i].fields[j].type +'" pattern="'+ pattern + '" placeholder="'+ placeholder +'" autocomplete="new-password" />';
 
-                                    if(pattern != '') {
+                                    if(pattern !== undefined) {
                                         html +=
                                                 '<span class="question_mark" onclick="showErrorLikeInfo(\'sc_'+ pMethods[i].fields[j].name +'\')"><span class="tooltip-icon"></span></span>'
                                                 +'<div class="apm_error" id="error_sc_'+ pMethods[i].fields[j].name +'">'
