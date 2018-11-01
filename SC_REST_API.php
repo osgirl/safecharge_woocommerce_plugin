@@ -179,6 +179,9 @@ class SC_REST_API
 
             $resp = curl_exec($ch);
             curl_close ($ch);
+            
+            $this->create_log($url, 'Call rest api URL: ');
+            $this->create_log($resp, 'Call rest api resp: ');
 
             if($resp === false) {
                 return false;
@@ -341,6 +344,7 @@ class SC_REST_API
         );
         
         if(!is_array(@$resp)) {
+            $this->create_log($resp, 'Process Payment response: ');
             return false;
         }
         
@@ -349,12 +353,15 @@ class SC_REST_API
     
     /**
      * Function get_session_token
-     * Get session tokens for different actions with the REST API
+     * Get session tokens for different actions with the REST API.
+     * We can call this method with Ajax when need tokenization.
      * 
      * @param array $data
+     * @param bool $is_ajax
+     * 
      * @return array|bool
      */
-    private function get_session_token($data)
+    public function get_session_token($data, $is_ajax = false)
     {
         if(!isset($data['merchant_id'], $data['merchantsite_id'])) {
             $this->create_log($data, 'No session variables: ');
@@ -387,11 +394,20 @@ class SC_REST_API
             || !isset($resp_arr['status'])
             || $resp_arr['status'] != 'SUCCESS'
         ) {
-        //    echo json_encode($data['test'] == 'yes' ? SC_TEST_SESSION_TOKEN_URL : SC_LIVE_SESSION_TOKEN_URL);
-        //    echo 'params: '.json_encode($params);
-        //    echo json_encode($resp_arr);
             $this->create_log($resp_arr, 'getting getSessionToken error: ');
+            
+            if($is_ajax) {
+                echo json_encode(array('status' => 0));
+                exit;
+            }
+            
             return false;
+        }
+        
+        if($is_ajax) {
+            $resp_arr['test'] = $_SESSION['SC_Variables']['test'];
+            echo json_encode(array('status' => 1, 'data' => $resp_arr));
+            exit;
         }
         
         return $resp_arr;
@@ -473,20 +489,23 @@ if(
     // set shis param in JS call to separate JS call from simple class load
     && $_POST['callFromJS'] == 1
 ) {
-    // if the Country come as POST variable
-    if(!empty($_SESSION['SC_Variables']['sc_country'])) {
-        $apms_getter = new SC_REST_API();
-        $apms_getter->get_rest_apms($_SESSION['SC_Variables'], true);
+    $apms_getter = new SC_REST_API();
+    
+    // when we want Session Token
+    if(@$_POST['needST'] == 1) {
+        $apms_getter->get_session_token($_SESSION['SC_Variables'], true);
     }
-    // WC calls this method twice, so we want to get APMs only on first call
+    // when we want APMs
     else {
-        $_SESSION['SC_Variables']['sc_country'] = $_POST['country'];
+        // if the Country come as POST variable
+        if(empty($_SESSION['SC_Variables']['sc_country'])) {
+            $_SESSION['SC_Variables']['sc_country'] = $_POST['country'];
+        }
         
-        $apms_getter = new SC_REST_API();
         $apms_getter->get_rest_apms($_SESSION['SC_Variables'], true);
     }
 }
-else {
+elseif(@$_SERVER['HTTP_X_REQUESTED_WITH'] == 'XMLHttpRequest') {
     echo json_encode(array(
         'status' => 0,
         'msg' => $_SESSION['SC_Variables']['payment_api'] != 'rest'
