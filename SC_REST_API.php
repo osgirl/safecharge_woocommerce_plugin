@@ -163,6 +163,17 @@ class SC_REST_API
 
             $json_post = json_encode($params);
             $this->create_log($params, 'json_post as array: ');
+            $this->create_log($json_post, 'json_post: ');
+            
+            $header =  array(
+                'Content-Type: application/json',
+                'Content-Length: ' . strlen($json_post),
+            );
+            
+            // fix for some servers
+            if(strpos($url, 'paymentAPM.do') !== false) {
+                $header[] = 'Expect: 100-continue';
+            }
 
             // create cURL post
             $ch = curl_init();
@@ -170,9 +181,7 @@ class SC_REST_API
             curl_setopt($ch, CURLOPT_URL, $url);
             curl_setopt($ch, CURLOPT_CUSTOMREQUEST, "POST");
             curl_setopt($ch, CURLOPT_POSTFIELDS, $json_post);
-            curl_setopt($ch, CURLOPT_HTTPHEADER, array(
-                'Content-Type:application/json', 'Content-Length: ' . strlen($json_post))
-            );
+            curl_setopt($ch, CURLOPT_HTTPHEADER, $header);
             curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
             curl_setopt($ch, CURLOPT_SSL_VERIFYPEER, false);
             curl_setopt($ch, CURLOPT_SSL_VERIFYHOST, false);
@@ -217,10 +226,9 @@ class SC_REST_API
                 echo json_encode(array(
                     'status' => 0,
                     'msg' => 'No Session Token',
-                    'data' => $data,
-                    'ses_t_data' => json_encode($session_token),
-                    'token' => $session_token)
-                );
+                //    'data' => $data,
+                    'ses_t_data' => json_encode($session_token_data),
+                ));
                 exit;
             }
             
@@ -281,7 +289,7 @@ class SC_REST_API
         
         $session_token_data = $this->get_session_token($sc_variables);
         $session_token = $session_token_data['sessionToken'];
-        $time = date('YmdHis', time());
+    //    $time = date('YmdHis', time());
         
         // some optional parameters are not included
         $params = array(
@@ -332,7 +340,11 @@ class SC_REST_API
         );
         
         $this->create_log(json_encode($params), 'Call REST API when Process Payment: ');
-    //    $this->create_log($data['checksum'], 'Checksum went to REST: ');
+        $this->create_log(
+            $sc_variables['merchant_id']. $sc_variables['merchantsite_id']. $data['client_request_id']. ((string) $data['total_amount']). $data['currency']. current(explode('_', $sc_variables['cri2']))
+            ,'Call REST API when Process Payment checksum string: '
+        );
+        $this->create_log($data['checksum'], 'Checksum went to REST: ');
         
         $resp = $this->call_rest_api(
             $this->apm_payment_url,
@@ -505,7 +517,11 @@ if(
         $apms_getter->get_rest_apms($_SESSION['SC_Variables'], true);
     }
 }
-elseif(@$_SERVER['HTTP_X_REQUESTED_WITH'] == 'XMLHttpRequest') {
+elseif(
+    @$_SERVER['HTTP_X_REQUESTED_WITH'] == 'XMLHttpRequest'
+    // don't come here when try to refund!
+    && @$_REQUEST['action'] != 'woocommerce_refund_line_items'
+) {
     echo json_encode(array(
         'status' => 0,
         'msg' => $_SESSION['SC_Variables']['payment_api'] != 'rest'

@@ -78,9 +78,5 @@ elseif(isset($_SERVER["SERVER_PROTOCOL"]) && strpos($_SERVER["SERVER_PROTOCOL"],
     define('SC_NOTIFY_URL', 'http://'. $_SERVER['HTTP_HOST'] . '/?wc-api=');
 }
 
-if(defined('WP_DEBUG') && WP_DEBUG === true) {
-    define('SC_DEBUG', true);
-}
-else {
-    define('SC_DEBUG', false);
-}
+// use it for creating logs
+define('SC_DEBUG', true);

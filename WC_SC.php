@@ -128,12 +128,6 @@ class WC_SC extends WC_Payment_Gateway
                 'type' => 'text',
                 'description' =>  __('Secret key is provided by '. SC_GATEWAY_TITLE, 'sc'),
             ),
-//            'URL' => array(
-//                'title' => __('Payment URL', 'sc'),
-//                'type' => 'text',
-//                'description' =>  __('Url to the payment gateway', 'sc'),
-//                'default' => 'https://secure.safecharge.com/ppp/purchase.do'
-//            ),
             'hash_type' => array(
                 'title' => __('Hash type', 'sc'),
                 'type' => 'select',
@@ -164,12 +158,6 @@ class WC_SC extends WC_Payment_Gateway
                 'label' => __('Show "Loading message" when redirect to secure Cashier. Does not work on the REST API.', 'sc'),
                 'default' => 'no'
             ),
-//            'load_payment_options' => array(
-//                'title' => __('Load payment options', 'sc'),
-//                'type' => 'checkbox',
-//                'label' => __('All available payment options will be loaded dynamically', 'sc'),
-//                'default' => 'yes'
-//            )
         );
     }
 
@@ -478,20 +466,20 @@ class WC_SC extends WC_Payment_Gateway
                 .$this->secret
             ));
             
-            $this->create_log($_SESSION['SC_Variables'], 'SC_Variables: ');
-            $this->create_log($params, 'params sent to REST: ');
-            $this->create_log($this->settings['hash_type'], 'Hash type: ');
-            $this->create_log(
-                $_SESSION['SC_Variables']['merchant_id']
-                    .$_SESSION['SC_Variables']['merchantsite_id']
-                    .$params['client_request_id']
-                    .$params['total_amount']
-                    .$params['currency']
-                    .$TimeStamp
-                    .$this->secret, 
-                'Checksum params: '
-            );
-            $this->create_log($params['checksum'], 'The Checksum: ');
+//            $this->create_log($_SESSION['SC_Variables'], 'SC_Variables: ');
+//            $this->create_log($params, 'params sent to REST: ');
+//            $this->create_log($this->settings['hash_type'], 'Hash type: ');
+//            $this->create_log(
+//                $_SESSION['SC_Variables']['merchant_id']
+//                    .$_SESSION['SC_Variables']['merchantsite_id']
+//                    .$params['client_request_id']
+//                    .$params['total_amount']
+//                    .$params['currency']
+//                    .$TimeStamp
+//                    .$this->secret, 
+//                'Checksum params: '
+//            );
+//            $this->create_log($params['checksum'], 'The Checksum: ');
             
             require_once 'SC_REST_API.php';
             
@@ -911,7 +899,6 @@ class WC_SC extends WC_Payment_Gateway
             try {
                 file_put_contents(SC_LOG_FILE_PATH, date('H:i:s') . ': ' . $d."\r\n"."\r\n", FILE_APPEND);
             }
-
             catch (Exception $exc) {
                 echo
                     '<script>'
