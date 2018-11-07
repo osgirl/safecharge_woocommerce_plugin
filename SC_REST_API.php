@@ -854,7 +854,7 @@ elseif(
     && @$_REQUEST['action'] != 'woocommerce_refund_line_items'
 ) {
     echo json_encode(array(
-        'status' => 0,
+        'status' => 2,
         'msg' => $_SESSION['SC_Variables']['payment_api'] != 'rest'
             ? 'You are using Cashier API. APMs are not available with it.' : 'Missing some of conditions to using REST API.'
     ));

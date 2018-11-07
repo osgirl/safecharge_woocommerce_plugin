@@ -322,6 +322,7 @@ var billing_country_first_val = '';
                         +'</ul>'
                     );
                 }
+                // if resp.status == 2 the user use Cashier
             });
     }
  }
