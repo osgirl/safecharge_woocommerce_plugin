@@ -56,9 +56,44 @@ else {
     define('SC_TEST_CASHIER_URL', 'https://ppp-test.safecharge.com/ppp/purchase.do');
 }
 
+// dynamic 3D payment
+define('SC_LIVE_D3D_URL', 'https://secure.safecharge.com/ppp/api/v1/dynamic3D.do');
+if(in_array(@$_SERVER['HTTP_HOST'], array('woocommerce-test.gw-4u.com', 'wordpress.mdev'))) {
+//    define('SC_TEST_D3D_URL', 'https://192.168.103.237/ppp/dynamic3D.do');
+    define('SC_TEST_D3D_URL', 'https://apmtest.gate2shop.com/ppp/dynamic3D.do');
+}
+else {
+    define('SC_TEST_D3D_URL', 'https://ppp-test.safecharge.com/ppp/api/v1/dynamic3D.do');
+}
+
+// payment with CC (cards) - not used at the moment
+define('SC_LIVE_PAYMENT_CC_URL', 'https://secure.safecharge.com/ppp/api/v1/paymentCC.do');
+if(in_array(@$_SERVER['HTTP_HOST'], array('woocommerce-test.gw-4u.com', 'wordpress.mdev'))) {
+//    define('SC_TEST_PAYMENT_CC_URL', 'https://192.168.103.237/ppp/paymentCC.do');
+    define('SC_TEST_PAYMENT_CC_URL', 'https://apmtest.gate2shop.com/ppp/paymentCC.do');
+}
+else {
+    define('SC_TEST_PAYMENT_CC_URL', 'https://ppp-test.safecharge.com/ppp/api/v1/paymentCC.do');
+}
+
 // user CPanel URLs
 define('SC_LIVE_CPANEL_URL', 'cpanel.safecharge.com');
 define('SC_TEST_CPANEL_URL', 'sandbox.safecharge.com');
+
+// payment card methods - array of methods, converted to json
+define('SC_PAYMENT_CARDS_METHODS', json_encode(array('cc_card')));
+
+// list of devices
+define('SC_DEVICES', json_encode(array('iphone', 'ipad', 'android', 'silk', 'blackberry', 'touch', 'linux', 'windows', 'mac')));
+
+// list of browsers
+define('SC_BROWSERS', json_encode(array('ucbrowser', 'firefox', 'chrome', 'opera', 'msie', 'edge', 'safari', 'blackberry', 'trident')));
+
+// list of devices types
+define('SC_DEVICES_TYPES', json_encode(array('tablet', 'mobile', 'tv', 'windows', 'linux')));
+
+// list of devices OSs
+define('SC_DEVICES_OS', json_encode(array('android', 'windows', 'linux', 'mac os')));
 
 # OPTIONAL CONSTANTS FOR WC
 

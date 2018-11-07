@@ -53,6 +53,7 @@ class WC_SC extends WC_Payment_Gateway
             $_SESSION['SC_Variables']['sc_country'] = $_POST["billing_country"];
         }
         
+        # Client Request ID 1 and Checksum 1 for Session Token 1
         // client request id 1
         $time = date('YmdHis', time());
         $_SESSION['SC_Variables']['cri1'] = $time. '_' .uniqid();
@@ -63,7 +64,9 @@ class WC_SC extends WC_Payment_Gateway
             $this->merchant_id . $this->merchantsite_id
                 . $_SESSION['SC_Variables']['cri1'] . $time . $this->secret
         );
+        # Client Request ID 1 and Checksum 1 END
         
+        # Client Request ID 2 and Checksum 2 to get AMPs
         // client request id 2
         $time = date('YmdHis', time());
         $_SESSION['SC_Variables']['cri2'] = $time. '_' .uniqid();
@@ -444,7 +447,6 @@ class WC_SC extends WC_Payment_Gateway
 
             echo $html;
         }
-        
         # REST API payment
         elseif($this->payment_api == 'rest') {
             $params['client_request_id'] = $TimeStamp .'_'. uniqid();
@@ -469,23 +471,32 @@ class WC_SC extends WC_Payment_Gateway
 //            $this->create_log($_SESSION['SC_Variables'], 'SC_Variables: ');
 //            $this->create_log($params, 'params sent to REST: ');
 //            $this->create_log($this->settings['hash_type'], 'Hash type: ');
-//            $this->create_log(
-//                $_SESSION['SC_Variables']['merchant_id']
-//                    .$_SESSION['SC_Variables']['merchantsite_id']
-//                    .$params['client_request_id']
-//                    .$params['total_amount']
-//                    .$params['currency']
-//                    .$TimeStamp
-//                    .$this->secret, 
-//                'Checksum params: '
-//            );
-//            $this->create_log($params['checksum'], 'The Checksum: ');
+            $this->create_log(
+                $_SESSION['SC_Variables']['merchant_id']
+                    .$_SESSION['SC_Variables']['merchantsite_id']
+                    .$params['client_request_id']
+                    .$params['total_amount']
+                    .$params['currency']
+                    .$TimeStamp
+                    .$this->secret, 
+                'Checksum params: '
+            );
+            $this->create_log($params['checksum'], 'The Checksum: ');
             
             require_once 'SC_REST_API.php';
-            
             $rest_api = new SC_REST_API();
+            
+        //    echo '<pre>'.print_r(@$_SESSION['SC_Variables']['APM_data'], true).'</pre>';
+        //    echo '<pre>'.print_r(@$_SERVER['HTTP_USER_AGENT'], true).'</pre>';
+            
+            // set the payment method type
+            $payment_method = 'apm';
+            if(@$_SESSION['SC_Variables']['APM_data']['payment_method'] == 'cc_card') {
+                $payment_method = 'd3d';
+            }
+            
             // ALWAYS CHECK USED PARAMS IN process_payment
-            $resp = $rest_api->process_payment($params, $_SESSION['SC_Variables'], $_REQUEST['order-pay']);
+            $resp = $rest_api->process_payment($params, $_SESSION['SC_Variables'], $_REQUEST['order-pay'], $payment_method);
             
             $this->create_log($resp, 'REST API response: ');
             $order_status = strtolower($order->get_status());
@@ -507,13 +518,13 @@ class WC_SC extends WC_Payment_Gateway
                 exit;
             }
             
+            if(isset($resp['transactionId'])) {
+                $order->update_meta_data(SC_GW_TRANS_ID_KEY, $resp['transactionId'], 0);
+            }
+            
             if($resp['status'] == 'ERROR') {
                 if($order_status == 'pending') {
                     $order->set_status('failed');
-                }
-                
-                if(isset($resp['transactionId'])) {
-                    $order->update_meta_data(SC_GW_TRANS_ID_KEY, $resp['transactionId'], 0);
                 }
                 
                 $order->add_order_note('Payment error: '.$resp['reason'].'.');
@@ -529,19 +540,27 @@ class WC_SC extends WC_Payment_Gateway
             }
             
             // pay with redirect URL
-            if(
-                $resp['status'] == 'SUCCESS'
-                && isset($resp['redirectURL'])
-                && !empty($resp['redirectURL'])
-            ) {
-                echo 
-                    '<script>'
-                        .'var newTab = window.open("'.$resp['redirectURL'].'", "_blank");'
-                        .'newTab.focus();'
-                        .'window.location.href = "'.$params['error_url'].'&status=waiting";'
-                    .'</script>';
-                
-                exit;
+            if($resp['status'] == 'SUCCESS') {
+                if(isset($resp['redirectURL']) && !empty($resp['redirectURL'])) {
+                    echo 
+                        '<script>'
+                            .'var newTab = window.open("'.$resp['redirectURL'].'", "_blank");'
+                            .'newTab.focus();'
+                            .'window.location.href = "'.$params['success_url'].'&status=waiting";'
+                        .'</script>';
+                    
+                    exit;
+                }
+                elseif(isset($resp['acsUrl']) && !empty($resp['acsUrl'])) {
+                    echo 
+                        '<script>'
+                            .'var newTab = window.open("'.$resp['acsUrl'].'", "_blank");'
+                            .'newTab.focus();'
+                            .'window.location.href = "'.$params['success_url'].'&status=waiting";'
+                        .'</script>';
+                    
+                    exit;
+                }
             }
             
             if($order_status == 'pending') {
@@ -550,7 +569,6 @@ class WC_SC extends WC_Payment_Gateway
             
             // If we get Transaction ID save it as meta-data
             if(@$resp['transactionId']) {
-                $order->update_meta_data(SC_GW_TRANS_ID_KEY, $resp['transactionId'], 0);
                 $order->add_order_note(__('Payment succsess for Transaction Id ', 'sc') . $resp['transactionId']);
             }
             else {
@@ -600,6 +618,12 @@ class WC_SC extends WC_Payment_Gateway
             ) {
                 $_SESSION['SC_Variables']['APM_data']['apm_fields'] = $_POST[$_POST['payment_method_sc']];
             }
+        }
+        
+        // lst parameter is passed from the form. It is the session token used for
+        // card tokenization. We MUST use the same token for D3D Payment
+        if(isset($_POST, $_POST['lst']) && !empty($_POST['lst'])) {
+            $_SESSION['SC_Variables']['lst'] = $_POST['lst'];
         }
         
         $order = new WC_Order($order_id);

@@ -18,7 +18,6 @@ require_once 'sc_config.php';
 class SC_REST_API
 {
     private $refund_url = '';
-    private $apm_payment_url = '';
     private $cpanel_url = '';
     // GW settings
     private $settings = array();
@@ -274,12 +273,13 @@ class SC_REST_API
     /**
      * Function process_payment
      * 
-     * @param array $data
+     * @param array $data - contains the checksum
      * @param array $sc_variables
      * @param string $order_id
      * 
      * @return array|bool
      */
+    /*
     public function process_payment($data, $sc_variables, $order_id = '')
     {
         $this->apm_payment_url = SC_TEST_PAYMENT_URL;
@@ -362,6 +362,143 @@ class SC_REST_API
         
         return $resp;
     }
+     * 
+     */
+    
+    /**
+     * Function process_payment
+     * 
+     * @param array $data - contains the checksum
+     * @param array $sc_variables
+     * @param string $order_id
+     * @param string $payment_method - apm|d3d
+     * 
+     * @return array|bool
+     */
+    public function process_payment($data, $sc_variables, $order_id, $payment_method)
+    {
+        // common parameters for the methods
+        $params = array(
+            'merchantId'        => $sc_variables['merchant_id'],
+            'merchantSiteId'    => $sc_variables['merchantsite_id'],
+            'userTokenId'       => $data['email'], // the email of the logged user or user who did the payment
+            'clientUniqueId'    => $order_id,
+            'clientRequestId'   => $data['client_request_id'],
+            'currency'          => $data['currency'],
+            'amount'            => (string) $data['total_amount'],
+            'amountDetails'     => array(
+                'totalShipping'     => '0.00',
+                'totalHandling'     => $data['handling'], // this is actually shipping
+                'totalDiscount'     => $data['discount'],
+                'totalTax'          => $data['total_tax'],
+            ),
+            'items'             => $data['items'],
+            'userDetails'       => array(
+                'firstName'         => $data['first_name'],
+                'lastName'          => $data['last_name'],
+                'address'           => $data['address1'],
+                'phone'             => $data['phone1'],
+                'zip'               => $data['zip'],
+                'city'              => $data['city'],
+                'country'           => $data['country'],
+                'state'             => '',
+                'email'             => $data['email'],
+                'county'            => '',
+            ),
+            'shippingAddress'   => array(
+                'firstName'         => $data['shippingFirstName'],
+                'lastName'          => $data['shippingLastName'],
+                'address'           => $data['shippingAddress'],
+                'cell'              => '',
+                'phone'             => '',
+                'zip'               => $data['shippingZip'],
+                'city'              => $data['shippingCity'],
+                'country'           => $data['shippingCountry'],
+                'state'             => '',
+                'email'             => '',
+                'shippingCounty'    => $data['shippingCountry'],
+            ),
+            'billingAddress'   => array(
+                'firstName'         => $data['first_name'],
+                'lastName'          => $data['last_name'],
+                'address'           => $data['address1'],
+                'cell'              => '',
+                'phone'             => $data['phone1'],
+                'zip'               => $data['zip'],
+                'city'              => $data['city'],
+                'country'           => $data['country'],
+                'state'             => $data['state'],
+                'email'             => $data['email'],
+                'county'            => '',
+            ),
+            'urlDetails'        => $data['urlDetails'],
+            'timeStamp'         => $data['time_stamp'],
+            'checksum'          => $data['checksum'],
+        );
+        
+        // set parameters specific for the payment method
+        switch ($payment_method) {
+            case 'apm':
+                // for D3D we use other token
+                $session_token_data = $this->get_session_token($sc_variables);
+                $session_token = @$session_token_data['sessionToken'];
+
+                if(!$session_token) {
+                    return false;
+                }
+                
+                $params['paymentMethod']    = $sc_variables['APM_data']['payment_method'];
+                $params['sessionToken']     = $session_token;
+                
+                $endpoint_url = $sc_variables['test'] == 'no' ? SC_LIVE_PAYMENT_URL : SC_TEST_PAYMENT_URL;
+                break;
+            
+            case 'd3d':
+                // in D3D use the session token from card tokenization
+                if(!isset($sc_variables['lst']) || empty($sc_variables['lst']) || !$sc_variables['lst']) {
+                    return false;
+                }
+                
+                $params['sessionToken']     = $sc_variables['lst'];
+                $params['isDynamic3D']      = 1;
+                $params['deviceDetails']    = $this->get_device_details();
+                $params['cardData']         = array(
+                    'ccTempToken'       => $sc_variables['APM_data']['apm_fields']['ccCardNumber'],
+                    'CVV'               => $sc_variables['APM_data']['apm_fields']['CVV'],
+                    'cardHolderName'    => $sc_variables['APM_data']['apm_fields']['ccNameOnCard'],
+                );
+                
+                $endpoint_url = $sc_variables['test'] == 'no' ? SC_LIVE_D3D_URL : SC_TEST_D3D_URL;
+                break;
+            
+            // if we can't set $endpoint_url stop here
+            default:
+                return false;
+        }
+        
+        $this->create_log(json_encode($params), 'Call REST API when Process Payment: ');
+        $this->create_log(
+            $sc_variables['merchant_id']. $sc_variables['merchantsite_id']. $data['client_request_id']. ((string) $data['total_amount']). $data['currency']. $data['time_stamp']
+            ,'Call REST API when Process Payment checksum string: '
+        );
+        $this->create_log($data['checksum'], 'Checksum went to REST: ');
+        
+        $resp = $this->call_rest_api(
+            $endpoint_url,
+            $params,
+            '',
+            '',
+            array(),
+            $data['checksum']
+        );
+        
+        if(!is_array(@$resp)) {
+            $this->create_log($resp, 'Process Payment response: ');
+            return false;
+        }
+        
+        return $resp;
+    }
     
     /**
      * Function get_session_token
@@ -423,6 +560,196 @@ class SC_REST_API
         }
         
         return $resp_arr;
+    }
+    
+    /**
+     * Function process_d3d_payment
+     * Pay with Dynamic 3D method.
+     * We call this method via Ajax
+     * 
+     * @param array $data - contains the checksum
+     * @param array $sc_variables
+     * @param string $order_id
+     */
+    /*
+    public function process_d3d_payment($data, $sc_variables, $order_id = '')
+    {
+        // first we need ned Session Token
+        $session_token_data = $this->get_session_token($data);
+        $session_token = @$session_token_data['sessionToken'];
+        
+        if(!$session_token_data || !$session_token) {
+            $this->create_log($session_token_data, 'Session Token is FALSE: ');
+            
+            echo json_encode(array('status' => 0, 'msg' => 'No Session Token',));
+            exit;
+        }
+        
+        // some optional parameters are missed
+        $params = array(
+            'sessionToken'      => $session_token,
+        //    'orderId'           => '', // optional
+            'merchantId'        => $sc_variables['merchant_id'],
+            'merchantSiteId'    => $sc_variables['merchantsite_id'],
+            'userTokenId'       => $data['email'], // the email of the logged user or user who did the payment
+            'clientUniqueId'    => $order_id,
+            'clientRequestId'   => $data['client_request_id'],
+            'isDynamic3D'       => 1,
+        //    'dynamic3DMode'     => 'ON',
+        //    'isRebilling'       => '', // optional
+            'currency'          => $data['currency'],
+            'amount'            => (string) $data['total_amount'],
+            'amountDetails'     => array(
+                'totalShipping'     => '0.00', // ?
+                'totalHandling'     => $data['handling'], // this is actually shipping
+                'totalDiscount'     => $data['discount'],
+                'totalTax'          => $data['total_tax'],
+            ),
+            'items'             => $data['items'],
+            'deviceDetails'     => $this->get_device_details(),
+            'userDetails'       => array(
+                'firstName'         => $data['first_name'],
+                'lastName'          => $data['last_name'],
+                'address'           => $data['address1'],
+                'phone'             => $data['phone1'],
+                'zip'               => $data['zip'],
+                'city'              => $data['city'],
+                'country'           => $data['country'],
+                'state'             => '', // ????
+                'email'             => $data['email'],
+                'county'            => '',
+            ),
+            'shippingAddress'   => array(
+                'firstName'         => $data['shippingFirstName'],
+                'lastName'          => $data['shippingLastName'],
+                'address'           => $data['shippingAddress'],
+                'cell'              => '',
+                'phone'             => '',
+                'zip'               => $data['shippingZip'],
+                'city'              => $data['shippingCity'],
+                'country'           => $data['shippingCountry'],
+                'state'             => '',
+                'email'             => '',
+                'shippingCounty'    => $data['shippingCountry'],
+            ),
+            'billingAddress'   => array(
+                'firstName'         => $data['first_name'],
+                'lastName'          => $data['last_name'],
+                'address'           => $data['address1'],
+                'cell'              => '',
+                'phone'             => $data['phone1'],
+                'zip'               => $data['zip'],
+                'city'              => $data['city'],
+                'country'           => $data['country'],
+                'state'             => $data['state'],
+                'email'             => $data['email'],
+                'county'            => '',
+            ),
+            'cardData'          => array(
+                'ccTempToken'       => $sc_variables['APM_data']['apm_fields']['ccCardNumber'],
+                'CVV'               => null,
+                'cardHolderName'    => $sc_variables['APM_data']['apm_fields']['ccNameOnCard'],
+            ),
+        //    'relatedTransactionId'  => '' // mandatory when isRebilling=1
+            'urlDetails'        => $data['urlDetails'],
+            'timeStamp'         => current(explode('_', $sc_variables['cri2'])),
+            'checksum'          => $data['checksum'],
+        );
+        
+        $this->create_log($_SERVER['HTTP_USER_AGENT'], 'HTTP_USER_AGENT: ');
+        $this->create_log($params, 'd3d $params: ');
+        
+        var_dump($_SERVER['HTTP_USER_AGENT']);
+        var_dump($params);
+    }
+     * 
+     */
+    
+    /**
+     * Function get_device_details
+     * Get browser and device based on HTTP_USER_AGENT.
+     * The method is based on D3D payment needs.
+     * 
+     * @return array $device_details
+     */
+    private function get_device_details()
+    {
+        $device_details = array(
+            'deviceType'    => 'UNKNOWN', // DESKTOP, SMARTPHONE, TABLET, TV, and UNKNOWN
+            'deviceName'    => '',
+            'deviceOS'      => '',
+            'browser'       => '',
+            'ipAddress'     => '',
+        );
+        
+        if(isset($_SERVER['HTTP_USER_AGENT']) && !empty(isset($_SERVER['HTTP_USER_AGENT']))) {
+            $user_agent = strtolower($_SERVER['HTTP_USER_AGENT']);
+            
+            $device_details['deviceName'] = $_SERVER['HTTP_USER_AGENT'];
+            
+            if(defined('SC_DEVICES_TYPES')) {
+                $devs_tps = json_decode(SC_DEVICES_TYPES, true);
+                
+                if(is_array($devs_tps) && !empty($devs_tps)) {
+                    foreach ($devs_tps as $d) {
+                        if (strstr($user_agent, $d) !== false) {
+                            if($d == 'linux' || $d == 'windows') {
+                                $device_details['deviceType'] = 'DESKTOP';
+                            }
+                            else {
+                                $device_details['deviceType'] = $d;
+                            }
+                            
+                            break;
+                        }
+                    }
+                }
+            }
+            
+            
+            if(defined('SC_DEVICES')) {
+                $devs = json_decode(SC_DEVICES, true);
+
+                if(is_array($devs) && !empty($devs)) {
+                    foreach ($devs as $d) {
+                        if (strstr($user_agent, $d) !== false) {
+                            $device_details['deviceOS'] = $d;
+                            break;
+                        }
+                    }
+                }
+            }
+
+            if(defined('SC_BROWSERS')) {
+                $brs = json_decode(SC_BROWSERS, true);
+                
+                if(is_array($brs) && !empty($brs)) {
+                    foreach ($brs as $b) {
+                        if (strstr($user_agent, $b) !== false) {
+                            $device_details['browser'] = $b;
+                            break;
+                        }
+                    }
+                }
+            }
+            
+            // get ip
+            $ip_address = '';
+
+            if (isset($_SERVER["REMOTE_ADDR"])) {
+                $ip_address = $_SERVER["REMOTE_ADDR"];
+            }
+            elseif (isset($_SERVER["HTTP_X_FORWARDED_FOR"])) {
+                $ip_address = $_SERVER["HTTP_X_FORWARDED_FOR"];
+            }
+            elseif (isset($_SERVER["HTTP_CLIENT_IP"])) {
+                $ip_address = $_SERVER["HTTP_CLIENT_IP"];
+            }
+
+            $device_details['ipAddress'] = (string) $ip_address;
+        }
+            
+        return $device_details;
     }
     
     /**
@@ -507,6 +834,10 @@ if(
     if(@$_POST['needST'] == 1) {
         $apms_getter->get_session_token($_SESSION['SC_Variables'], true);
     }
+    // go to Dynamic 3D payment 
+//    elseif(@$_POST['d3d'] == 1) {
+//        $apms_getter->process_d3d_payment($_SESSION['SC_Variables']);
+//    }
     // when we want APMs
     else {
         // if the Country come as POST variable

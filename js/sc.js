@@ -52,8 +52,10 @@ var billing_country_first_val = '';
     }
     
     if(formValid) {
-        // check for method needed tokenization
+        // check if method needed tokenization
         if(tokAPMs.indexOf(selectedPM) > -1) {
+            jQuery('#custom_loader').show();
+            
             var payload = {
                 merchantSiteId: '',
             //    environment:    '',
@@ -70,9 +72,9 @@ var billing_country_first_val = '';
                 cardData: {
                     cardNumber:         jQuery('#' + selectedPM + '_' + tokAPMsFields.cardNumber).val(),
                     cardHolderName:     jQuery('#' + selectedPM + '_' + tokAPMsFields.cardHolderName).val(),
-                    expirationMonth:    jQuery('#' + selectedPM + '_' + tokAPMsFields.expirationMonth).val().toString(),
+                    expirationMonth:    jQuery('#' + selectedPM + '_' + tokAPMsFields.expirationMonth).val(),
                     expirationYear:     jQuery('#' + selectedPM + '_' + tokAPMsFields.expirationYear).val(),
-                    CVV:                ''
+                    CVV:                null
                 }
             };
             
@@ -87,7 +89,6 @@ var billing_country_first_val = '';
                 dataType: 'json'
             })
                 .done(function(resp){
-                    console.log(resp)
                     if(resp.status == 1 && typeof resp.data != 'undefined') {
                         payload.merchantSiteId = resp.data.merchantId;
                         payload.sessionToken = resp.data.sessionToken;
@@ -96,8 +97,6 @@ var billing_country_first_val = '';
                             payload.environment = 'test';
                         }
                         
-                        console.log(payload)
-                    
                         // get tokenization card number
                         if(typeof Safecharge != 'undefined') {
                             Safecharge.card.createToken(payload, safechargeResultHandler);
@@ -114,14 +113,22 @@ var billing_country_first_val = '';
  
  // handler for tokenization result
  function safechargeResultHandler(resp) {
-    console.log(resp)
-    
     if(resp.status == 'ERROR') {
+        jQuery('#custom_loader').hide();
         
+        jQuery('form.woocommerce-checkout').prepend(
+            '<ul class="woocommerce-error" role="alert">'
+                +'<li><strong>Error when try to proceed the payment. Please, try again later!</strong></li>'
+            +'</ul>'
+        );
     }
     else if(resp.status == 'SUCCESS') {
         jQuery('#' + selectedPM + '_' + tokAPMsFields.cardNumber).val(resp.ccTempToken);
-        jQuery('form.woocommerce-checkout').submit();
+        jQuery('#custom_loader').hide();
+        
+        jQuery('form.woocommerce-checkout')
+            .append('<input type="hidden" name="lst", value="'+resp.sessionToken+'" />')
+            .submit();
     }
  }
  
@@ -188,6 +195,34 @@ var billing_country_first_val = '';
                             newImg = '<img src="'+ pMethods[i]['logoURL'].replace('/svg/', '/svg/solid-white/')
                                     +'" alt="'+ pmMsg +'">';
                         }
+                        
+                        // for cc_card CVV field is mandtory, if miss, add it:
+                        if(pMethods[i].paymentMethod == 'cc_card') {
+                            var addCVVField = true;
+                            
+                            for(var f in pMethods[i].fields) {
+                                if(pMethods[i].fields[f].name.toLowerCase() == 'cvv') {
+                                    addCVVField = false;
+                                    break;
+                                }
+                            }
+                            
+                            if(addCVVField) {
+                                pMethods[i].fields.push({
+                                    name: 'CVV'
+                                    ,regex: '^[0-9]{3,4}$'
+                                    ,type: 'number'
+                                    ,validationmessage: [{
+                                        message: 'CVV must be 3 or 4 digits!'
+                                        ,language: 'en'
+                                    }]
+                                    ,caption: [{
+                                        message: 'CVV Number'
+                                        ,language: 'en'
+                                    }]
+                                });
+                            }
+                        }
 
                         html +=
                             '<li class="apm_container">'
@@ -250,7 +285,7 @@ var billing_country_first_val = '';
                                 '</div>'
                             +'</li>';
                     }
-
+                    
                     html +=
                         '</ul>';
 
@@ -268,6 +303,9 @@ var billing_country_first_val = '';
                             // insert the html
                             jQuery('.payment_method_sc:last').append(html);
                             jQuery('form[name="checkout"]').attr('onsubmit', "return false;");
+                            
+                            // add loading screen
+                            jQuery('#payment').append('<div id="custom_loader" class="blockUI"></div>');
 
                             // change submit button type and behavior
                             jQuery('form.woocommerce-checkout button[type=submit]')
