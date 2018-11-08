@@ -27,15 +27,15 @@ class SC_REST_API
      * Create a refund.
      * 
      * @params array $settings - the GW settings
-     * @params string $refund_json - system last refund data as json
+     * @params array $refund - system last refund data
      * @params array $order_meta_data - additional meta data for the order
      * @params string $currency - used currency
      * @params string $notify_url
      */
-    public function sc_refund_order(array $settings, $refund_json, array $order_meta_data, $currency, $notify_url)
+    public function sc_refund_order(array $settings, array $refund, array $order_meta_data, $currency, $notify_url)
     {
         $this->settings = $settings;
-        $refund = json_decode($refund_json, true);
+        $this->create_log($refund, 'Refund data: ');
         
         $this->refund_url = SC_TEST_REFUND_URL;
         $this->cpanel_url = SC_TEST_CPANEL_URL;
@@ -50,7 +50,10 @@ class SC_REST_API
         // order transaction ID
         $ord_tr_id = $order_meta_data['order_tr_id'];
         if(!$ord_tr_id || empty($ord_tr_id)) {
-            return 'The Order does not have Transaction ID. Refund can not procceed.';
+            return array(
+                'msg' => 'The Order does not have Transaction ID. Refund can not procceed.',
+                'new_order_status' => ''
+            );
         }
         
         $ref_parameters = array(
@@ -58,11 +61,11 @@ class SC_REST_API
             'merchantSiteId'        => $this->settings['merchantsite_id'],
             'clientRequestId'       => $time . '_' . $ord_tr_id,
             'clientUniqueId'        => $ord_tr_id,
-            'amount'                => number_format($refund['data']['amount'], 2),
+            'amount'                => number_format($refund['amount'], 2),
             'currency'              => $currency,
             'relatedTransactionId'  => $ord_tr_id, // GW Transaction ID
             'authCode'              => $order_meta_data['auth_code'],
-            'comment'               => $refund['data']['reason'], // optional
+            'comment'               => $refund['reason'], // optional
             'url'                   => $notify_url,
             'timeStamp'             => $time,
         );
@@ -82,13 +85,18 @@ class SC_REST_API
             $other_params
         );
         
+        $this->create_log($json_arr, 'Refund Response: ');
+        
         $note = '';
         $error_note = 'Please manually delete request Refund #'
             .$refund['id'].' form the order or login into <i>'. $this->cpanel_url
             .'</i> and refund Transaction ID '.$ord_tr_id;
         
         if($json_arr === false){
-            return 'The REST API retun false. ' . $error_note;
+            return array(
+                'msg' => 'The REST API retun false. ' . $error_note,
+                'new_order_status' => ''
+            );
         }
         
         if(!is_array($json_arr)) {
@@ -96,33 +104,58 @@ class SC_REST_API
         }
 
         if(!is_array($json_arr)) {
-            return 'Invalid API response. ' . $error_note;
+            return array(
+                'msg' => 'Invalid API response. ' . $error_note,
+                'new_order_status' => ''
+            );
         }
         
-        $this->create_log($json_arr, 'json_arr: ');
-        
-        // the status of the request
+        // the status of the request is ERROR
         if(isset($json_arr['status']) && $json_arr['status'] == 'ERROR') {
-            return 'Error, Invalid checksum. ' . $error_note;
+            return array(
+                'msg' => 'Request ERROR - "' . $json_arr['reason'] .'" '. $error_note,
+                'new_order_status' => ''
+            );
         }
         
-        // check the transaction status
-        if(isset($json_arr['transactionStatus']) && $json_arr['transactionStatus'] == 'ERROR') {
-            if(isset($json_arr['gwErrorReason']) && !empty($json_arr['gwErrorReason'])) {
-                $note = $json_arr['gwErrorReason'];
-            }
-            elseif(isset($json_arr['paymentMethodErrorReason']) && !empty($json_arr['paymentMethodErrorReason'])) {
-                $note = $json_arr['paymentMethodErrorReason'];
-            }
-            else {
-                $note = 'Transaction error';
+        // the status of the request is SUCCESS, check the transaction status
+        if(isset($json_arr['transactionStatus']) && !empty($json_arr['transactionStatus'])) {
+            if($json_arr['transactionStatus'] == 'ERROR') {
+                if(isset($json_arr['gwErrorReason']) && !empty($json_arr['gwErrorReason'])) {
+                    $note = $json_arr['gwErrorReason'];
+                }
+                elseif(isset($json_arr['paymentMethodErrorReason']) && !empty($json_arr['paymentMethodErrorReason'])) {
+                    $note = $json_arr['paymentMethodErrorReason'];
+                }
+                else {
+                    $note = 'Transaction error';
+                }
+                
+                return array(
+                    'msg' => $note. '. ' .$error_note,
+                    'new_order_status' => ''
+                );
             }
             
-            return $note. '. ' .$error_note;
+            if($json_arr['transactionStatus'] == 'DECLINED') {
+                return array(
+                    'msg' => 'The refun was declined. ' .$error_note,
+                    'new_order_status' => ''
+                );
+            }
+            
+            if($json_arr['transactionStatus'] == 'APPROVED') {
+                return array(
+                    'msg' => 'Your request - Refund #' . $refund['id'] . ', was successful.',
+                    'new_order_status' => 'refunded'
+                );
+            }
         }
         
-        // create refund note
-        return 'Your request - Refund #' . $refund['id'] . ', was successful.';
+        return array(
+            'msg' => 'The status of request - Refund #' . $refund['id'] . ', is UNKONOWN.',
+            'new_order_status' => ''
+        );
     }
     
     /**

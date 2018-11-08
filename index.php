@@ -30,9 +30,6 @@ function woocommerce_sc_init()
 	add_action('init', 'sc_enqueue');
 	add_action('woocommerce_thankyou_order_received_text', 'sc_show_final_text');
     add_action('woocommerce_create_refund', 'sc_create_refund');
-    // try to catch ajax
-    add_action( 'wp_ajax_my_action', 'my_action' );
-    add_action( 'wp_ajax_nopriv_my_action', 'my_action' );
     // Check checkout for selected apm ONLY when payment api is REST
     add_action( 'woocommerce_checkout_process', 'sc_check_checkout_apm', 20 ) ;
 }
@@ -173,6 +170,13 @@ function sc_create_refund()
     // get order refunds
     $order = new WC_Order( (int)$_REQUEST['order_id'] );
     $refunds = $order->get_refunds();
+    
+    if(!$refunds || !isset($refunds[0]) || !is_array($refunds[0]->data)) {
+        $order -> add_order_note(__('There are no refunds data. If refund was made, delete it manually!', 'sc'));
+        $order->save();
+        wp_send_json_success();
+    }
+    
     $order_meta_data = array(
         'order_tr_id' => $order->get_meta(SC_GW_TRANS_ID_KEY),
         'auth_code' => $order->get_meta(SC_AUTH_CODE_KEY),
@@ -182,16 +186,21 @@ function sc_create_refund()
     require_once 'SC_REST_API.php';
     $sc_api = new SC_REST_API();
     
-    // execute refund, the response must be note to save in the order
+    // execute refund, the response must be array('msg' => 'some msg', 'new_order_status' => 'some status')
     $resp = $sc_api->sc_refund_order(
         $gateway->settings
-        ,json_encode($refunds[0]) // get the last refund
+        ,$refunds[0]->data
         ,$order_meta_data
         ,get_woocommerce_currency()
         ,SC_NOTIFY_URL . 'Rest'
     );
     
-    $order -> add_order_note(__($resp, 'sc'));
+    $order -> add_order_note(__($resp['msg'], 'sc'));
+    
+    if(!empty($resp['new_order_status'])) {
+        $order->set_status($resp['new_order_status']);
+    }
+    
     $order->save();
     wp_send_json_success();
 }
@@ -208,55 +217,3 @@ function sc_check_checkout_apm()
         wc_add_notice( '<strong>' . $notice . '</strong>', 'error' );
     }
 }
-
-/**
-     * Function create_log
-     * Create logs. You MUST have defined SC_LOG_FILE_PATH const,
-     * holding the full path to the log file.
-     * 
-     * @param mixed $data
-     * @param string $title - title of the printed log
-     */
-    function create_log($data, $title = '')
-    {
-        if(!defined('WP_DEBUG') || WP_DEBUG === false) {
-            return;
-        }
-        
-        $d = '';
-        
-        if(is_array($data) || is_object($data)) {
-            $d = print_r($data, true);
-        //    $d = mb_convert_encoding($d, 'UTF-8');
-            $d = '<pre>'.$d.'</pre>';
-        }
-        elseif(is_string($data)) {
-        //    $d = mb_convert_encoding($data, 'UTF-8');
-            $d = '<pre>'.$d.'</pre>';
-        }
-        elseif(is_bool($data)) {
-            $d = $data ? 'true' : 'false';
-            $d = '<pre>'.$d.'</pre>';
-        }
-        else {
-            $d = '<pre>'.$data.'</pre>';
-        }
-        
-        if(!empty($title)) {
-            $d = '<h3>'.$title.'</h3>'."\r\n".$d;
-        }
-        
-        try {
-            if(defined('SC_LOG_FILE_PATH')) {
-                file_put_contents(SC_LOG_FILE_PATH, date('H:i:s') . ': ' . $d."\r\n"."\r\n", FILE_APPEND);
-            }
-        }
-        catch (Exception $exc) {
-            echo
-                '<script>'
-                    .'error.log("Log file was not created, by reason: '.$exc.'");'
-                    .'console.log("Log file was not created, by reason: '.$data.'");'
-                .'</script>';
-        }
-
-    }

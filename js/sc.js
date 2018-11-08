@@ -375,5 +375,6 @@ jQuery(function() {
     ) {
         getAPMs();
     }
+    
 });
 // document ready function END
