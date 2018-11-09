@@ -3,10 +3,10 @@
 Tags: credit card, safecharge, woocommerce
 Wordpress requirements: 
 	- minimum v4.7
-	- tested up to v4.9
+	- tested up to v4.9.8
 WooCommerce requirements: 
 	- minimum v 3.0
-	- tested up to v3.4
+	- tested up to v3.5.1
 Stable tag: 1.5
 
 == Description ==
@@ -19,7 +19,7 @@ Right payment methods at the checkout page can bring you global reach, help you 
 
 = Automatic installation =
 
-Please note, v1.1 of this gateway requires WooCommerce 3.0 and above.
+Please note, this gateway requires WooCommerce 3.0 and above.
 
 To do an automatic install of, log in to your WordPress dashboard, navigate to the Plugins menu and click Add New.
 
