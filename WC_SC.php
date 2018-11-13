@@ -40,7 +40,7 @@ class WC_SC extends WC_Payment_Gateway
 		$this -> payment_api = isset($this->settings['payment_api'])
             ? $this->settings['payment_api'] : 'cashier';
         
-        # set session variables for future use, like when we get APMs for a country
+        # set session variables for REST API
         $_SESSION['SC_Variables']['merchant_id']        = $this->merchant_id;
         $_SESSION['SC_Variables']['merchantsite_id']    = $this->merchantsite_id;
         $_SESSION['SC_Variables']['currencyCode']       = get_woocommerce_currency();
@@ -408,7 +408,6 @@ class WC_SC extends WC_Payment_Gateway
             }
 
             $this->create_log($this->URL, 'Endpoint URL: ');
-            $this->create_log($this->secret, 'Secret: ');
             $this->create_log($for_hash, '$for_hash: ');
             $this->create_log($this->hash_type, '$this->hash_type: ');
             $this->create_log($params, 'Order params');
@@ -468,26 +467,8 @@ class WC_SC extends WC_Payment_Gateway
                 .$this->secret
             ));
             
-//            $this->create_log($_SESSION['SC_Variables'], 'SC_Variables: ');
-//            $this->create_log($params, 'params sent to REST: ');
-//            $this->create_log($this->settings['hash_type'], 'Hash type: ');
-            $this->create_log(
-                $_SESSION['SC_Variables']['merchant_id']
-                    .$_SESSION['SC_Variables']['merchantsite_id']
-                    .$params['client_request_id']
-                    .$params['total_amount']
-                    .$params['currency']
-                    .$TimeStamp
-                    .$this->secret, 
-                'Checksum params: '
-            );
-            $this->create_log($params['checksum'], 'The Checksum: ');
-            
             require_once 'SC_REST_API.php';
             $rest_api = new SC_REST_API();
-            
-        //    echo '<pre>'.print_r(@$_SESSION['SC_Variables']['APM_data'], true).'</pre>';
-        //    echo '<pre>'.print_r(@$_SERVER['HTTP_USER_AGENT'], true).'</pre>';
             
             // set the payment method type
             $payment_method = 'apm';
@@ -495,11 +476,14 @@ class WC_SC extends WC_Payment_Gateway
                 $payment_method = 'd3d';
             }
             
+            $this->create_log($params, 'params sent to REST: ');
+            $this->create_log($_SESSION['SC_Variables'], 'SC_Variables: ');
+            $this->create_log($payment_method, 'payment method: ');
+            
             // ALWAYS CHECK USED PARAMS IN process_payment
             $resp = $rest_api->process_payment($params, $_SESSION['SC_Variables'], $_REQUEST['order-pay'], $payment_method);
             
             $this->create_log($resp, 'REST API response: ');
-            $order_status = strtolower($order->get_status());
             
             if(!$resp) {
                 if($order_status == 'pending') {
@@ -563,6 +547,7 @@ class WC_SC extends WC_Payment_Gateway
                 }
             }
             
+            $order_status = strtolower($order->get_status());
             if($order_status == 'pending') {
                 $order->set_status('completed');
             }
@@ -579,7 +564,7 @@ class WC_SC extends WC_Payment_Gateway
             echo 
                 '<script>'
                     .'window.location.href = "'
-                        .$params['error_url'].'&status=success&wc-api=WC_SC_Rest";'
+                        .$params['error_url'].'&status=success";'
                 .'</script>';
             
             exit;
@@ -900,28 +885,21 @@ class WC_SC extends WC_Payment_Gateway
         
         if(is_array($data) || is_object($data)) {
             $d = print_r($data, true);
-        //    $d = mb_convert_encoding($d, 'UTF-8');
-            $d = '<pre>'.$d.'</pre>';
-        }
-        elseif(is_string($data)) {
-        //    $d = mb_convert_encoding($data, 'UTF-8');
-            $d = '<pre>'.$data.'</pre>';
         }
         elseif(is_bool($data)) {
             $d = $data ? 'true' : 'false';
-            $d = '<pre>'.$d.'</pre>';
         }
         else {
-            $d = '<pre>'.$data.'</pre>';
+            $d = $data;
         }
         
         if(!empty($title)) {
-            $d = '<h3>'.$title.'</h3>'."\r\n".$d;
+            $d = $title . "\r\n" . $d;
         }
         
         if(defined('SC_LOG_FILE_PATH')) {
             try {
-                file_put_contents(SC_LOG_FILE_PATH, date('H:i:s') . ': ' . $d."\r\n"."\r\n", FILE_APPEND);
+                file_put_contents(SC_LOG_FILE_PATH, date('H:i:s') . ': ' . $d . "\r\n"."\r\n", FILE_APPEND);
             }
             catch (Exception $exc) {
                 echo

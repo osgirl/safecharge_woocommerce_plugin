@@ -70,6 +70,15 @@ class SC_REST_API
             'timeStamp'             => $time,
         );
         
+        $checksum = '';
+        foreach($ref_parameters as $val) {
+            $checksum .= $val;
+        }
+        $checksum = hash(
+            $this->settings['hash_type'],
+            $checksum . $this->settings['secret']
+        );
+        
         $other_params = array(
             'urlDetails'            => array('notificationUrl' => $notify_url),
         );
@@ -80,8 +89,7 @@ class SC_REST_API
         $json_arr = $this->call_rest_api(
             $this->refund_url,
             $ref_parameters,
-            $this->settings['secret'],
-            $this->settings['hash_type'],
+            $checksum,
             $other_params
         );
         
@@ -165,26 +173,15 @@ class SC_REST_API
      * 
      * @param type $url - API URL
      * @param array $checksum_params - parameters we use for checksum
-     * @param string $secret - merchant secret
-     * @param string $hash - merchant hash
-     * @param array $other_params - other parameters we use
      * @param string $checksum - the checksum
+     * @param array $other_params - other parameters we use
      * 
      * @return mixed
      */
-    public function call_rest_api($url, $checksum_params, $secret, $hash, $other_params = array(), $checksum = '')
+    public function call_rest_api($url, $checksum_params, $checksum, $other_params = array())
     {
         try {
             $checksum_params['checksum'] = $checksum;
-
-            if($checksum == '') {
-                foreach($checksum_params as $val) {
-                    $checksum .= $val;
-                }
-
-                $checksum .= $secret;
-                $checksum_params['checksum'] = hash($hash, $checksum);
-            }
 
             if(!empty($other_params) and is_array($other_params)) {
                 $params = array_merge($checksum_params, $other_params);
@@ -288,10 +285,8 @@ class SC_REST_API
         $resp_arr = $this->call_rest_api(
             $data['test'] == 'yes' ? SC_TEST_REST_PAYMENT_METHODS_URL : SC_LIVE_REST_PAYMENT_METHODS_URL,
             $checksum_params,
-            '',
-            '',
-            $other_params,
-            $data['cs2']
+            $data['cs2'],
+            $other_params
         );
         
         if($is_ajax) {
@@ -302,101 +297,6 @@ class SC_REST_API
         return json_encode(array('status' => 1, 'data' => $resp_arr));
         # get merchant payment methods END
     }
-    
-    /**
-     * Function process_payment
-     * 
-     * @param array $data - contains the checksum
-     * @param array $sc_variables
-     * @param string $order_id
-     * 
-     * @return array|bool
-     */
-    /*
-    public function process_payment($data, $sc_variables, $order_id = '')
-    {
-        $this->apm_payment_url = SC_TEST_PAYMENT_URL;
-        if($sc_variables['test'] == 'no') {
-            $this->apm_payment_url = SC_LIVE_PAYMENT_URL;
-        }
-        
-        $session_token_data = $this->get_session_token($sc_variables);
-        $session_token = $session_token_data['sessionToken'];
-    //    $time = date('YmdHis', time());
-        
-        // some optional parameters are not included
-        $params = array(
-            'sessionToken'      => $session_token,
-            'merchantId'        => $sc_variables['merchant_id'],
-            'merchantSiteId'    => $sc_variables['merchantsite_id'],
-            'userTokenId'       => '', // optional - ID of the user in the merchant’s system.
-            'clientUniqueId'    => $order_id,
-            'clientRequestId'   => $data['client_request_id'],
-            'currency'          => $data['currency'],
-            'amount'            => (string) $data['total_amount'],
-            'amountDetails'     => array(
-                'totalShipping'     => '0.00', // ?
-                'totalHandling'     => $data['handling'], // this is actually shipping
-                'totalDiscount'     => $data['discount'],
-                'totalTax'          => $data['total_tax'],
-            ),
-            'items'             => $data['items'],
-            'userDetails'       => array(
-                'firstName'             => $data['first_name'],
-                'lastName'              => $data['last_name'],
-                'address'               => $data['address1'],
-                'phone'                 => $data['phone1'],
-                'zip'                   => $data['zip'],
-                'city'                  => $data['city'],
-                'country'               => $data['country'],
-                'state'                 => '', // ????
-                'email'                 => $data['email'],
-                'county'                => '',
-            ),
-            'shippingAddress'   => array(
-                'firstName'             => $data['shippingFirstName'],
-                'lastName'              => $data['shippingLastName'],
-                'address'               => $data['shippingAddress'],
-                'cell'                  => '',
-                'phone'                 => '',
-                'zip'                   => $data['shippingZip'],
-                'city'                  => $data['shippingCity'],
-                'country'               => $data['shippingCountry'],
-                'state'                 => '',
-                'email'                 => '',
-                'shippingCounty'        => $data['shippingCountry'],
-            ),
-            'paymentMethod'         => $sc_variables['APM_data']['payment_method'],
-            'urlDetails'            => $data['urlDetails'],
-            'timeStamp'             => current(explode('_', $sc_variables['cri2'])),
-            'checksum'              => $data['checksum'],
-        );
-        
-        $this->create_log(json_encode($params), 'Call REST API when Process Payment: ');
-        $this->create_log(
-            $sc_variables['merchant_id']. $sc_variables['merchantsite_id']. $data['client_request_id']. ((string) $data['total_amount']). $data['currency']. current(explode('_', $sc_variables['cri2']))
-            ,'Call REST API when Process Payment checksum string: '
-        );
-        $this->create_log($data['checksum'], 'Checksum went to REST: ');
-        
-        $resp = $this->call_rest_api(
-            $this->apm_payment_url,
-            $params,
-            '',
-            '',
-            array(),
-            $data['checksum']
-        );
-        
-        if(!is_array(@$resp)) {
-            $this->create_log($resp, 'Process Payment response: ');
-            return false;
-        }
-        
-        return $resp;
-    }
-     * 
-     */
     
     /**
      * Function process_payment
@@ -519,9 +419,6 @@ class SC_REST_API
         $resp = $this->call_rest_api(
             $endpoint_url,
             $params,
-            '',
-            '',
-            array(),
             $data['checksum']
         );
         
@@ -564,9 +461,6 @@ class SC_REST_API
         $resp_arr = $this->call_rest_api(
             $data['test'] == 'yes' ? SC_TEST_SESSION_TOKEN_URL : SC_LIVE_SESSION_TOKEN_URL,
             $params,
-            '',
-            '',
-            array(),
             $data['cs1']
         );
         
@@ -594,109 +488,6 @@ class SC_REST_API
         
         return $resp_arr;
     }
-    
-    /**
-     * Function process_d3d_payment
-     * Pay with Dynamic 3D method.
-     * We call this method via Ajax
-     * 
-     * @param array $data - contains the checksum
-     * @param array $sc_variables
-     * @param string $order_id
-     */
-    /*
-    public function process_d3d_payment($data, $sc_variables, $order_id = '')
-    {
-        // first we need ned Session Token
-        $session_token_data = $this->get_session_token($data);
-        $session_token = @$session_token_data['sessionToken'];
-        
-        if(!$session_token_data || !$session_token) {
-            $this->create_log($session_token_data, 'Session Token is FALSE: ');
-            
-            echo json_encode(array('status' => 0, 'msg' => 'No Session Token',));
-            exit;
-        }
-        
-        // some optional parameters are missed
-        $params = array(
-            'sessionToken'      => $session_token,
-        //    'orderId'           => '', // optional
-            'merchantId'        => $sc_variables['merchant_id'],
-            'merchantSiteId'    => $sc_variables['merchantsite_id'],
-            'userTokenId'       => $data['email'], // the email of the logged user or user who did the payment
-            'clientUniqueId'    => $order_id,
-            'clientRequestId'   => $data['client_request_id'],
-            'isDynamic3D'       => 1,
-        //    'dynamic3DMode'     => 'ON',
-        //    'isRebilling'       => '', // optional
-            'currency'          => $data['currency'],
-            'amount'            => (string) $data['total_amount'],
-            'amountDetails'     => array(
-                'totalShipping'     => '0.00', // ?
-                'totalHandling'     => $data['handling'], // this is actually shipping
-                'totalDiscount'     => $data['discount'],
-                'totalTax'          => $data['total_tax'],
-            ),
-            'items'             => $data['items'],
-            'deviceDetails'     => $this->get_device_details(),
-            'userDetails'       => array(
-                'firstName'         => $data['first_name'],
-                'lastName'          => $data['last_name'],
-                'address'           => $data['address1'],
-                'phone'             => $data['phone1'],
-                'zip'               => $data['zip'],
-                'city'              => $data['city'],
-                'country'           => $data['country'],
-                'state'             => '', // ????
-                'email'             => $data['email'],
-                'county'            => '',
-            ),
-            'shippingAddress'   => array(
-                'firstName'         => $data['shippingFirstName'],
-                'lastName'          => $data['shippingLastName'],
-                'address'           => $data['shippingAddress'],
-                'cell'              => '',
-                'phone'             => '',
-                'zip'               => $data['shippingZip'],
-                'city'              => $data['shippingCity'],
-                'country'           => $data['shippingCountry'],
-                'state'             => '',
-                'email'             => '',
-                'shippingCounty'    => $data['shippingCountry'],
-            ),
-            'billingAddress'   => array(
-                'firstName'         => $data['first_name'],
-                'lastName'          => $data['last_name'],
-                'address'           => $data['address1'],
-                'cell'              => '',
-                'phone'             => $data['phone1'],
-                'zip'               => $data['zip'],
-                'city'              => $data['city'],
-                'country'           => $data['country'],
-                'state'             => $data['state'],
-                'email'             => $data['email'],
-                'county'            => '',
-            ),
-            'cardData'          => array(
-                'ccTempToken'       => $sc_variables['APM_data']['apm_fields']['ccCardNumber'],
-                'CVV'               => null,
-                'cardHolderName'    => $sc_variables['APM_data']['apm_fields']['ccNameOnCard'],
-            ),
-        //    'relatedTransactionId'  => '' // mandatory when isRebilling=1
-            'urlDetails'        => $data['urlDetails'],
-            'timeStamp'         => current(explode('_', $sc_variables['cri2'])),
-            'checksum'          => $data['checksum'],
-        );
-        
-        $this->create_log($_SERVER['HTTP_USER_AGENT'], 'HTTP_USER_AGENT: ');
-        $this->create_log($params, 'd3d $params: ');
-        
-        var_dump($_SERVER['HTTP_USER_AGENT']);
-        var_dump($params);
-    }
-     * 
-     */
     
     /**
      * Function get_device_details
@@ -803,28 +594,21 @@ class SC_REST_API
         
         if(is_array($data) || is_object($data)) {
             $d = print_r($data, true);
-        //    $d = mb_convert_encoding($d, 'UTF-8');
-            $d = '<pre>'.$d.'</pre>';
-        }
-        elseif(is_string($data)) {
-        //    $d = mb_convert_encoding($data, 'UTF-8');
-            $d = '<pre>'.$data.'</pre>';
         }
         elseif(is_bool($data)) {
             $d = $data ? 'true' : 'false';
-            $d = '<pre>'.$d.'</pre>';
         }
         else {
-            $d = '<pre>'.$data.'</pre>';
+            $d = $data;
         }
         
         if(!empty($title)) {
-            $d = '<h3>'.$title.'</h3>'."\r\n".$d;
+            $d = $title . "\r\n" . $d;
         }
         
         if(defined('SC_LOG_FILE_PATH')) {
             try {
-                file_put_contents(SC_LOG_FILE_PATH, date('H:i:s') . ': ' . $d."\r\n"."\r\n", FILE_APPEND);
+                file_put_contents(SC_LOG_FILE_PATH, date('H:i:s') . ': ' . $d . "\r\n"."\r\n", FILE_APPEND);
             }
 
             catch (Exception $exc) {

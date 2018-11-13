@@ -49,22 +49,25 @@ function sc_enqueue($hook)
     /*  Skip order status update if currentlly received status is 'pending' and curent order status is 'completed'.
     * For the rest of the cases the status should be updated.   */
     if(
-        isset($_REQUEST['Status'], $_REQUEST['wc-api'], $_REQUEST['invoice_id'])
-        && $_REQUEST['wc-api'] == 'WC_Gateway_SC'
+        isset($_REQUEST['wc-api'], $_REQUEST['Status'], $_REQUEST['invoice_id'])
+        && !empty($_REQUEST['wc-api'])
         && !empty($_REQUEST['Status'])
         && !empty($_REQUEST['invoice_id'])
+        && strtolower($_REQUEST['wc-api']) == 'wc_gateway_sc'
     ) {
         $arr = explode("_", $_REQUEST['invoice_id']);
-        $order_id  = $arr[0];
-        $order = new WC_Order($order_id);
-        $order_status = strtolower($order->get_status());
-        
-        if (
-            $order_id
-            && strtolower($_REQUEST['Status']) == 'pending'
-            && $order_status != 'completed'
-        ) {
-            $order->set_status($_REQUEST['Status']);
+
+        if(is_array($arr) && $arr) {
+            $order_id  = $arr[0];
+            $order = new WC_Order($order_id);
+
+            if($order_id && $order && strtolower($_REQUEST['Status']) == 'pending') {
+                $order_status = strtolower($order->get_status());
+
+                if ($order_status != 'completed') {
+                    $order->set_status($_REQUEST['Status']);
+                }
+            }
         }
     }
     
