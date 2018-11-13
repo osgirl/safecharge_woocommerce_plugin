@@ -586,7 +586,7 @@ class SC_REST_API
      */
     private function create_log($data, $title = '')
     {
-        if(!defined('SC_DEBUG') || SC_DEBUG === false) {
+        if(!@$_SESSION['save_logs'] || $_SESSION['save_logs'] == 'no') {
             return;
         }
         

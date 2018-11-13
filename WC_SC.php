@@ -14,31 +14,29 @@ class WC_SC extends WC_Payment_Gateway
         require_once 'SC_Versions_Resolver.php';
         
         $plugin_dir = basename(dirname(__FILE__));
-        $this -> plugin_path = plugin_dir_path( __FILE__ ) . $plugin_dir . '/';
-        $this -> plugin_url = get_site_url() . '/wp-content/plugins/'.$plugin_dir.'/';
+        $this->plugin_path = plugin_dir_path( __FILE__ ) . $plugin_dir . '/';
+        $this->plugin_url = get_site_url() . '/wp-content/plugins/'.$plugin_dir.'/';
         
         # settings to get/save options
-		$this -> id = 'sc';
-		$this -> method_title = SC_GATEWAY_TITLE;
-		$this -> method_description = 'Pay with '. SC_GATEWAY_TITLE .'.';
-        $this -> icon = $this -> plugin_url."icons/safecharge.png";
-		$this -> has_fields = false;
+		$this->id                   = 'sc';
+		$this->method_title         = SC_GATEWAY_TITLE;
+		$this->method_description   = 'Pay with '. SC_GATEWAY_TITLE .'.';
+        $this->icon                 = $this->plugin_url."icons/safecharge.png";
+		$this->has_fields           = false;
 
-		$this -> init_form_fields();
-		$this -> init_settings();
+		$this->init_form_fields();
+		$this->init_settings();
         
-		$this -> title = $this -> settings['title'];
-		$this -> description = $this -> settings['description'];
-		$this -> merchant_id = $this -> settings['merchant_id'];
-		$this -> merchantsite_id = $this -> settings['merchantsite_id'];
-        $this -> secret = $this -> settings['secret'];
-		$this -> test = $this -> settings['test'];
-		$this -> show_thanks_msg = $this->settings['show_thanks_msg'];
-		$this -> show_thanks_msg = $this->settings['show_thanks_msg'];
-		$this -> hash_type = isset($this->settings['hash_type'])
-            ? $this->settings['hash_type'] : 'sha256';
-		$this -> payment_api = isset($this->settings['payment_api'])
-            ? $this->settings['payment_api'] : 'cashier';
+		$this->title            = @$this->settings['title'] ? $this->settings['title'] : '';
+		$this->description      = @$this->settings['description'] ? $this->settings['description'] : '';
+		$this->merchant_id      = @$this->settings['merchant_id'] ? $this->settings['merchant_id'] : '';
+		$this->merchantsite_id  = @$this->settings['merchantsite_id'] ? $this->settings['merchantsite_id'] : '';
+        $this->secret           = @$this->settings['secret'] ? $this->settings['secret'] : '';
+		$this->test             = @$this->settings['test'] ? $this->settings['test'] : 'yes';
+		$this->show_thanks_msg  = @$this->settings['show_thanks_msg'] ? $this->settings['show_thanks_msg'] : 'no';
+        $this->save_logs        = @$this->settings['save_logs'] ? $this->settings['save_logs'] : 'yes';
+        $this->hash_type        = @$this->settings['hash_type'] ? $this->settings['hash_type'] : 'sha256';
+		$this->payment_api      = @$this->settings['payment_api'] ? $this->settings['payment_api'] : 'cashier';
         
         # set session variables for REST API
         $_SESSION['SC_Variables']['merchant_id']        = $this->merchant_id;
@@ -47,6 +45,7 @@ class WC_SC extends WC_Payment_Gateway
         $_SESSION['SC_Variables']['languageCode']       = $this->formatLocation(get_locale());
         $_SESSION['SC_Variables']['payment_api']        = $this->payment_api;
         $_SESSION['SC_Variables']['test']               = $this->test;
+        $_SESSION['SC_Variables']['save_logs']          = $this->save_logs;
         
         $_SESSION['SC_Variables']['sc_country'] = SC_Versions_Resolver::get_client_country(new WC_Customer);
         if(isset($_POST["billing_country"]) && !empty($_POST["billing_country"])) {
@@ -80,12 +79,12 @@ class WC_SC extends WC_Payment_Gateway
         );
         # set session variables for future use END
         
-		$this -> msg['message'] = "";
-		$this -> msg['class'] = "";
+		$this->msg['message'] = "";
+		$this->msg['class'] = "";
 
         SC_Versions_Resolver::process_admin_options($this);
 		add_action('woocommerce_checkout_process', array($this, 'sc_checkout_process'));
-		add_action('woocommerce_receipt_'.$this -> id, array($this, 'receipt_page'));
+		add_action('woocommerce_receipt_'.$this->id, array($this, 'receipt_page'));
 		add_action('woocommerce_api_wc_gateway_sc', array($this, 'process_sc_notification'));
 		add_action('woocommerce_api_wc_sc_rest', array($this, 'process_sc_notification'));
 	}
@@ -96,7 +95,7 @@ class WC_SC extends WC_Payment_Gateway
      */
 	public function init_form_fields()
     {
-       $this -> form_fields = array(
+       $this->form_fields = array(
             'enabled' => array(
                 'title' => __('Enable/Disable', 'sc'),
                 'type' => 'checkbox',
@@ -161,6 +160,12 @@ class WC_SC extends WC_Payment_Gateway
                 'label' => __('Show "Loading message" when redirect to secure Cashier. Does not work on the REST API.', 'sc'),
                 'default' => 'no'
             ),
+            'save_logs' => array(
+                'title' => __('Save logs', 'sc'),
+                'type' => 'checkbox',
+                'label' => __('Crate and save daily log files. This can help for debugging and catching bugs.', 'sc'),
+                'default' => 'yes'
+            ),
         );
     }
 
@@ -171,7 +176,7 @@ class WC_SC extends WC_Payment_Gateway
             '<h3>'.__(SC_GATEWAY_TITLE .' ', 'sc').'</h3>'
             .'<p>'.__('SC payment option').'</p>'
             .'<table class="form-table">';
-                $this -> generate_settings_html();
+                $this->generate_settings_html();
         echo '</table>';
     }
 
@@ -183,8 +188,8 @@ class WC_SC extends WC_Payment_Gateway
      **/
     public function payment_fields()
     {
-		if($this -> description) {
-            echo wpautop(wptexturize($this -> description));
+		if($this->description) {
+            echo wpautop(wptexturize($this->description));
         }
         
         // echo here some html part if needed
@@ -289,8 +294,8 @@ class WC_SC extends WC_Payment_Gateway
         }
         
         $params['total_tax'] = number_format($total_tax_prec, 2, '.', '');
-		$params['merchant_id'] = $this -> merchant_id;
-		$params['merchant_site_id'] = $this -> merchantsite_id;
+		$params['merchant_id'] = $this->merchant_id;
+		$params['merchant_site_id'] = $this->merchantsite_id;
 		$params['time_stamp'] = $TimeStamp;
 		$params['encoding'] ='utf8';
 		$params['version'] = '4.0.0';
@@ -413,7 +418,7 @@ class WC_SC extends WC_Payment_Gateway
             $this->create_log($params, 'Order params');
 
             $html =
-                '<form action="'.$this -> URL.'" method="post" id="sc_payment_form">'
+                '<form action="'.$this->URL.'" method="post" id="sc_payment_form">'
                     .implode('', $params_array)
                     .'<noscript>'
                         .'<input type="submit" class="button-alt" id="submit_sc_payment_form" value="'.__('Pay via '. SC_GATEWAY_TITLE, 'sc').'" /><a class="button cancel" href="'.$order->get_cancel_order_url().'">'.__('Cancel order &amp; restore cart', 'sc').'</a>'
@@ -490,7 +495,7 @@ class WC_SC extends WC_Payment_Gateway
                     $order->set_status('failed');
                 }
                 
-                $order -> add_order_note(__('Payment API response is FALSE.', 'sc'));
+                $order->add_order_note(__('Payment API response is FALSE.', 'sc'));
                 $order->save();
                 
                 $this->create_log($resp, 'REST API Payment ERROR: ');
@@ -557,7 +562,7 @@ class WC_SC extends WC_Payment_Gateway
                 $order->add_order_note(__('Payment succsess for Transaction Id ', 'sc') . $resp['transactionId']);
             }
             else {
-                $order -> add_order_note(__('Payment succsess.'));
+                $order->add_order_note(__('Payment succsess.'));
             }
             $order->save();
             
@@ -671,11 +676,11 @@ class WC_SC extends WC_Payment_Gateway
                     $this->change_order_status($order, $order_id, $status, $transactionType);
                 }
                 else {
-                    $this -> msg['class'] = 'error';
-                    $this -> msg['message'] = "Security Error. Checksum validation faild.";
-                    $order -> update_status('failed');
-                    $order -> add_order_note('Failed');
-                    $order -> add_order_note($this->msg['message']);
+                    $this->msg['class'] = 'error';
+                    $this->msg['message'] = "Security Error. Checksum validation faild.";
+                    $order->update_status('failed');
+                    $order->add_order_note('Failed');
+                    $order->add_order_note($this->msg['message']);
                 }
 
                 add_action('the_content', array(&$this, 'showMessage'));
@@ -714,7 +719,7 @@ class WC_SC extends WC_Payment_Gateway
 
 	public function showMessage($content)
     {
-        return '<div class="box '.$this -> msg['class'].'-box">'.$this -> msg['message'].'</div>'.$content;
+        return '<div class="box '.$this->msg['class'].'-box">'.$this->msg['message'].'</div>'.$content;
     }
 
 	public function checkAdvancedCheckSum()
@@ -792,33 +797,33 @@ class WC_SC extends WC_Payment_Gateway
         switch($status) {
             case 'CANCELED':
                 $message = 'Payment status changed to:' .$transactionType. '. PPP_TransactionID = '. @$_REQUEST['PPP_TransactionID']. ", Status = " .$status. ', GW_TransactionID = '. @$_REQUEST['TransactionID'];
-                $this -> msg['message'] = $message;
-                $this -> msg['class'] = 'woocommerce_message';
-                $order -> update_status('failed');
-                $order -> add_order_note('Failed');
-                $order -> add_order_note($this->msg['message']);
+                $this->msg['message'] = $message;
+                $this->msg['class'] = 'woocommerce_message';
+                $order->update_status('failed');
+                $order->add_order_note('Failed');
+                $order->add_order_note($this->msg['message']);
             break;
 
             case 'APPROVED':
                 $message ='The amount has been authorized and captured by '. SC_GATEWAY_TITLE .'. PPP_TransactionID = '. @$_REQUEST['PPP_TransactionID'] .", Status = ". $status .", TransactionType = ". $transactionType .', GW_TransactionID = '. @$_REQUEST['TransactionID'];
-                $this -> msg['message'] = $message;
-                $this -> msg['class'] = 'woocommerce_message';
-                $order -> payment_complete($order_id);
+                $this->msg['message'] = $message;
+                $this->msg['class'] = 'woocommerce_message';
+                $order->payment_complete($order_id);
 
                 $order->update_status( 'completed' );
-                $order -> add_order_note(SC_GATEWAY_TITLE .' payment is successful<br/>Unique Id: '. @$_REQUEST['PPP_TransactionID']);
-                $order -> add_order_note($this->msg['message']);
-                $woocommerce -> cart -> empty_cart();
+                $order->add_order_note(SC_GATEWAY_TITLE .' payment is successful<br/>Unique Id: '. @$_REQUEST['PPP_TransactionID']);
+                $order->add_order_note($this->msg['message']);
+                $woocommerce->cart->empty_cart();
             break;
 
             case 'ERROR':
             case 'DECLINED':
                 $message ='Payment failed. PPP_TransactionID = '. @$_REQUEST['PPP_TransactionID'] .", Status = ". $status .", Error code = ". @$_REQUEST['ErrCode'] .", Message = ". @$_REQUEST['message'] .", TransactionType = ". $transactionType .', GW_TransactionID = '. $_REQUEST['TransactionID'];
-                $this -> msg['message'] = $message;
-                $this -> msg['class'] = 'woocommerce_message';
-                $order -> update_status('failed');
-                $order -> add_order_note('Failed');
-                $order -> add_order_note($this->msg['message']);
+                $this->msg['message'] = $message;
+                $this->msg['class'] = 'woocommerce_message';
+                $order->update_status('failed');
+                $order->add_order_note('Failed');
+                $order->add_order_note($this->msg['message']);
             break;
 
             case 'PENDING':
@@ -828,12 +833,12 @@ class WC_SC extends WC_Payment_Gateway
                 }
                 
                 $message ='Payment is still pending, PPP_TransactionID '. @$_REQUEST['PPP_TransactionID'] .", Status = ". $status .", TransactionType = ". $transactionType .', GW_TransactionID = '. @$_REQUEST['TransactionID'];
-                $this -> msg['message'] = $message;
-                $this -> msg['class'] = 'woocommerce_message woocommerce_message_info';
-                $order -> add_order_note(SC_GATEWAY_TITLE .' payment status is pending<br/>Unique Id: '. @$_REQUEST['PPP_TransactionID']);
-                $order -> add_order_note($this->msg['message']);
-                $order -> update_status('on-hold');
-                $woocommerce -> cart -> empty_cart();
+                $this->msg['message'] = $message;
+                $this->msg['class'] = 'woocommerce_message woocommerce_message_info';
+                $order->add_order_note(SC_GATEWAY_TITLE .' payment status is pending<br/>Unique Id: '. @$_REQUEST['PPP_TransactionID']);
+                $order->add_order_note($this->msg['message']);
+                $order->update_status('on-hold');
+                $woocommerce->cart->empty_cart();
             break;
         }
         
@@ -877,7 +882,7 @@ class WC_SC extends WC_Payment_Gateway
      */
     private function create_log($data, $title = '')
     {
-        if(!defined('WP_DEBUG') || WP_DEBUG === false) {
+        if(@$this->save_logs || $this->save_logs == 'no') {
             return;
         }
         
