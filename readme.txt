@@ -7,7 +7,7 @@ Wordpress requirements:
 WooCommerce requirements: 
 	- minimum v 3.0
 	- tested up to v3.5.1
-Stable tag: 1.5
+Stable tag: 1.5.1
 
 == Description ==
 
@@ -42,8 +42,8 @@ Please, contact out Tech-Support team (tech-support@safecharge.com) in case of q
 
 == Changelog ==
 
-= 1.6 - 2018-11-12 =
-* New - The merchant will have an option to enable or disable creating logs for the plugin's work. The logs creating methods will be called at all kew places.
+= 1.5.1 - 2018-11-13 =
+* Add - The merchant have an option to enable or disable creating logs for the plugin's work.
 
 = 1.5 - 2018-11-01 =
 * Add - Added Tokenization for card payment methods.
