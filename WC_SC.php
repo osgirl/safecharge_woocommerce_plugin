@@ -38,7 +38,8 @@ class WC_SC extends WC_Payment_Gateway
         $this->hash_type        = @$this->settings['hash_type'] ? $this->settings['hash_type'] : 'sha256';
 		$this->payment_api      = @$this->settings['payment_api'] ? $this->settings['payment_api'] : 'cashier';
         
-        # set session variables for REST API
+        // TODO
+        # set session variables for REST API, according REST variables names
         $_SESSION['SC_Variables']['merchant_id']        = $this->merchant_id;
         $_SESSION['SC_Variables']['merchantsite_id']    = $this->merchantsite_id;
         $_SESSION['SC_Variables']['currencyCode']       = get_woocommerce_currency();
