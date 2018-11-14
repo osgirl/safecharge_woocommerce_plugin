@@ -882,7 +882,11 @@ class WC_SC extends WC_Payment_Gateway
      */
     private function create_log($data, $title = '')
     {
-        if(@$this->save_logs || $this->save_logs == 'no') {
+        if(
+            !isset($this->save_logs)
+            || $this->save_logs == 'no'
+            || $this->save_logs === null
+        ) {
             return;
         }
         

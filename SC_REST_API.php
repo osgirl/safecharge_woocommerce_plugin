@@ -83,6 +83,7 @@ class SC_REST_API
             'urlDetails'            => array('notificationUrl' => $notify_url),
         );
         
+        $this->create_log($this->refund_url, 'URL: ');
         $this->create_log($ref_parameters, 'refund_parameters: ');
         $this->create_log($other_params, 'other_params: ');
         
@@ -191,8 +192,7 @@ class SC_REST_API
             }
 
             $json_post = json_encode($params);
-            $this->create_log($params, 'json_post as array: ');
-            $this->create_log($json_post, 'json_post: ');
+            $this->create_log($json_post, 'params as json: ');
             
             $header =  array(
                 'Content-Type: application/json',
@@ -255,7 +255,6 @@ class SC_REST_API
                 echo json_encode(array(
                     'status' => 0,
                     'msg' => 'No Session Token',
-                //    'data' => $data,
                     'ses_t_data' => json_encode($session_token_data),
                 ));
                 exit;
@@ -409,12 +408,12 @@ class SC_REST_API
                 return false;
         }
         
-        $this->create_log(json_encode($params), 'Call REST API when Process Payment: ');
+        $this->create_log($params, 'Call REST API when Process Payment: ');
         $this->create_log(
             $sc_variables['merchant_id']. $sc_variables['merchantsite_id']. $data['client_request_id']. ((string) $data['total_amount']). $data['currency']. $data['time_stamp']
-            ,'Call REST API when Process Payment checksum string: '
+            ,'Call REST API when Process Payment checksum string without the secret: '
         );
-        $this->create_log($data['checksum'], 'Checksum went to REST: ');
+        $this->create_log($data['checksum'], 'Checksum sent to REST: ');
         
         $resp = $this->call_rest_api(
             $endpoint_url,
@@ -456,7 +455,11 @@ class SC_REST_API
             'timeStamp'         => current(explode('_', $data['cri1'])),
         );
 
-        $this->create_log($params, 'Call REST API for Session Token $params: ');
+        $this->create_log(
+            $data['test'] == 'yes' ? SC_TEST_SESSION_TOKEN_URL : SC_LIVE_SESSION_TOKEN_URL,
+            'Call REST API for Session Token with URL: '
+        );
+        $this->create_log($params, 'Call REST API for Session Token with params: ');
         
         $resp_arr = $this->call_rest_api(
             $data['test'] == 'yes' ? SC_TEST_SESSION_TOKEN_URL : SC_LIVE_SESSION_TOKEN_URL,
@@ -586,7 +589,11 @@ class SC_REST_API
      */
     private function create_log($data, $title = '')
     {
-        if(!@$_SESSION['save_logs'] || $_SESSION['save_logs'] == 'no') {
+        if(
+            !isset($_SESSION['SC_Variables']['save_logs'])
+            || $_SESSION['SC_Variables']['save_logs'] == 'no'
+            || $_SESSION['SC_Variables']['save_logs'] === null
+        ) {
             return;
         }
         
