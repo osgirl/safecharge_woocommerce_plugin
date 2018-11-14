@@ -42,6 +42,9 @@ Please, contact out Tech-Support team (tech-support@safecharge.com) in case of q
 
 == Changelog ==
 
+= 1.6 - 2018-11-14 =
+* New - Map variables according names convention in the REST API.
+
 = 1.5.1 - 2018-11-13 =
 * Add - The merchant have an option to enable or disable creating logs for the plugin's work.
 
