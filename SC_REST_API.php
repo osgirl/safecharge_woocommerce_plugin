@@ -57,8 +57,8 @@ class SC_REST_API
         }
         
         $ref_parameters = array(
-            'merchantId'            => $this->settings['merchant_id'],
-            'merchantSiteId'        => $this->settings['merchantsite_id'],
+            'merchantId'            => $this->settings['merchantId'],
+            'merchantSiteId'        => $this->settings['merchantSiteId'],
             'clientRequestId'       => $time . '_' . $ord_tr_id,
             'clientUniqueId'        => $ord_tr_id,
             'amount'                => number_format($refund['amount'], 2),
@@ -265,8 +265,8 @@ class SC_REST_API
         
         # get merchant payment methods
         $checksum_params = array(
-            'merchantId'        => $data['merchant_id'],
-            'merchantSiteId'    => $data['merchantsite_id'],
+            'merchantId'        => $data['merchantId'],
+            'merchantSiteId'    => $data['merchantSiteId'],
             'clientRequestId'   => $data['cri2'],
             'timeStamp'         => current(explode('_', $data['cri2'])),
         );
@@ -311,8 +311,8 @@ class SC_REST_API
     {
         // common parameters for the methods
         $params = array(
-            'merchantId'        => $sc_variables['merchant_id'],
-            'merchantSiteId'    => $sc_variables['merchantsite_id'],
+            'merchantId'        => $sc_variables['merchantId'],
+            'merchantSiteId'    => $sc_variables['merchantSiteId'],
             'userTokenId'       => $data['email'], // the email of the logged user or user who did the payment
             'clientUniqueId'    => $order_id,
             'clientRequestId'   => $data['client_request_id'],
@@ -410,7 +410,9 @@ class SC_REST_API
         
         $this->create_log($params, 'Call REST API when Process Payment: ');
         $this->create_log(
-            $sc_variables['merchant_id']. $sc_variables['merchantsite_id']. $data['client_request_id']. ((string) $data['total_amount']). $data['currency']. $data['time_stamp']
+            $sc_variables['merchantId'] . $sc_variables['merchantSiteId']
+                .$data['client_request_id'] . ((string) $data['total_amount'])
+                .$data['currency']. $data['time_stamp']
             ,'Call REST API when Process Payment checksum string without the secret: '
         );
         $this->create_log($data['checksum'], 'Checksum sent to REST: ');
@@ -441,7 +443,7 @@ class SC_REST_API
      */
     public function get_session_token($data, $is_ajax = false)
     {
-        if(!isset($data['merchant_id'], $data['merchantsite_id'])) {
+        if(!isset($data['merchantId'], $data['merchantSiteId'])) {
             $this->create_log($data, 'No session variables: ');
             return false;
         }
@@ -449,8 +451,8 @@ class SC_REST_API
         $time = date('YmdHis', time());
 
         $params = array(
-            'merchantId'        => $data['merchant_id'],
-            'merchantSiteId'    => $data['merchantsite_id'],
+            'merchantId'        => $data['merchantId'],
+            'merchantSiteId'    => $data['merchantSiteId'],
             'clientRequestId'   => $data['cri1'],
             'timeStamp'         => current(explode('_', $data['cri1'])),
         );
@@ -634,8 +636,8 @@ class SC_REST_API
 if(
     isset(
         $_SERVER['HTTP_X_REQUESTED_WITH']
-        ,$_SESSION['SC_Variables']['merchant_id']
-        ,$_SESSION['SC_Variables']['merchantsite_id']
+        ,$_SESSION['SC_Variables']['merchantId']
+        ,$_SESSION['SC_Variables']['merchantSiteId']
         ,$_SESSION['SC_Variables']['sc_country']
         ,$_SESSION['SC_Variables']['currencyCode']
         ,$_SESSION['SC_Variables']['languageCode']

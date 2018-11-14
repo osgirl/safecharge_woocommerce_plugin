@@ -29,8 +29,8 @@ class WC_SC extends WC_Payment_Gateway
         
 		$this->title            = @$this->settings['title'] ? $this->settings['title'] : '';
 		$this->description      = @$this->settings['description'] ? $this->settings['description'] : '';
-		$this->merchant_id      = @$this->settings['merchant_id'] ? $this->settings['merchant_id'] : '';
-		$this->merchantsite_id  = @$this->settings['merchantsite_id'] ? $this->settings['merchantsite_id'] : '';
+		$this->merchantId       = @$this->settings['merchantId'] ? $this->settings['merchantId'] : '';
+		$this->merchantSiteId   = @$this->settings['merchantSiteId'] ? $this->settings['merchantSiteId'] : '';
         $this->secret           = @$this->settings['secret'] ? $this->settings['secret'] : '';
 		$this->test             = @$this->settings['test'] ? $this->settings['test'] : 'yes';
 		$this->show_thanks_msg  = @$this->settings['show_thanks_msg'] ? $this->settings['show_thanks_msg'] : 'no';
@@ -38,10 +38,9 @@ class WC_SC extends WC_Payment_Gateway
         $this->hash_type        = @$this->settings['hash_type'] ? $this->settings['hash_type'] : 'sha256';
 		$this->payment_api      = @$this->settings['payment_api'] ? $this->settings['payment_api'] : 'cashier';
         
-        // TODO
         # set session variables for REST API, according REST variables names
-        $_SESSION['SC_Variables']['merchant_id']        = $this->merchant_id;
-        $_SESSION['SC_Variables']['merchantsite_id']    = $this->merchantsite_id;
+        $_SESSION['SC_Variables']['merchantId']         = $this->merchantId;
+        $_SESSION['SC_Variables']['merchantSiteId']    = $this->merchantSiteId;
         $_SESSION['SC_Variables']['currencyCode']       = get_woocommerce_currency();
         $_SESSION['SC_Variables']['languageCode']       = $this->formatLocation(get_locale());
         $_SESSION['SC_Variables']['payment_api']        = $this->payment_api;
@@ -61,7 +60,7 @@ class WC_SC extends WC_Payment_Gateway
         // checksum 1 - checksum for session token
         $_SESSION['SC_Variables']['cs1'] = hash(
             $this->hash_type,
-            $this->merchant_id . $this->merchantsite_id
+            $this->merchantId . $this->merchantSiteId
                 . $_SESSION['SC_Variables']['cri1'] . $time . $this->secret
         );
         # Client Request ID 1 and Checksum 1 END
@@ -75,7 +74,7 @@ class WC_SC extends WC_Payment_Gateway
         $time = date('YmdHis', time());
         $_SESSION['SC_Variables']['cs2'] = hash(
             $this->hash_type,
-            $this->merchant_id . $this->merchantsite_id
+            $this->merchantId . $this->merchantSiteId
                 . $_SESSION['SC_Variables']['cri2'] . $time . $this->secret
         );
         # set session variables for future use END
@@ -116,12 +115,12 @@ class WC_SC extends WC_Payment_Gateway
                 'default' => __('Pay securely by Credit or Debit card or local payment option through '
                     .SC_GATEWAY_TITLE .' secured payment page.', 'sc')
             ),
-            'merchant_id' => array(
+            'merchantId' => array(
                 'title' => __('Merchant ID', 'sc'),
                 'type' => 'text',
                 'description' => __('Merchant ID is provided by '. SC_GATEWAY_TITLE .'.')
             ),
-            'merchantsite_id' => array(
+            'merchantSiteId' => array(
                 'title' => __('Merchant Site ID', 'sc'),
                 'type' => 'text',
                 'description' => __('Merchant Site ID is provided by '. SC_GATEWAY_TITLE .'.')
@@ -295,8 +294,8 @@ class WC_SC extends WC_Payment_Gateway
         }
         
         $params['total_tax'] = number_format($total_tax_prec, 2, '.', '');
-		$params['merchant_id'] = $this->merchant_id;
-		$params['merchant_site_id'] = $this->merchantsite_id;
+		$params['merchant_id'] = $this->merchantId;
+		$params['merchant_site_id'] = $this->merchantSiteId;
 		$params['time_stamp'] = $TimeStamp;
 		$params['encoding'] ='utf8';
 		$params['version'] = '4.0.0';
@@ -454,6 +453,11 @@ class WC_SC extends WC_Payment_Gateway
         }
         # REST API payment
         elseif($this->payment_api == 'rest') {
+            // map here variables names different for Cashier and REST
+            $params['merchantId'] = $this->merchantId;
+            $params['merchantSiteId'] = $this->merchantSiteId;
+            // map here variables names different for Cashier and REST END
+            
             $params['client_request_id'] = $TimeStamp .'_'. uniqid();
             
             $params['urlDetails'] = array(
@@ -464,8 +468,8 @@ class WC_SC extends WC_Payment_Gateway
             );
                 
             $params['checksum'] = hash($this->settings['hash_type'], stripslashes(
-                $_SESSION['SC_Variables']['merchant_id']
-                .$_SESSION['SC_Variables']['merchantsite_id']
+                $_SESSION['SC_Variables']['merchantId']
+                .$_SESSION['SC_Variables']['merchantSiteId']
                 .$params['client_request_id']
                 .$params['total_amount']
                 .$params['currency']
