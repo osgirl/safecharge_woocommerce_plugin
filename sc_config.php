@@ -1,7 +1,10 @@
 <?php
 
 /* 
- * Put all Constants here
+ * Put all Constants here.
+ * 
+ * 2018
+ * SafeCharge
  */
 
 define('SC_GATEWAY_TITLE', 'SafeCharge');

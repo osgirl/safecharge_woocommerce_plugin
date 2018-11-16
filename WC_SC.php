@@ -1,5 +1,15 @@
 <?php
 
+/**
+ * WC_SC Class
+ * 
+ * Main class for the SafeCharge Plugin
+ * 
+ * 2018
+ * 
+ * @author SafeCharge
+ */
+
 if (!session_id()) {
     session_start();
 }

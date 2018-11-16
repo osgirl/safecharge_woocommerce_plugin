@@ -86,7 +86,7 @@ function sc_enqueue($hook)
         'sc_js_script',
         'myAjax',
         array(
-            'ajaxurl' => WP_PLUGIN_URL . '/' . $plugin_dir .'/SC_REST_API.php',
+            'ajaxurl' => WP_PLUGIN_URL . '/' . $plugin_dir .'/sc_ajax.php',
         )
     );  
     wp_enqueue_script( 'sc_js_script' );
