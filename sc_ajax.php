@@ -12,6 +12,8 @@ if (!session_id()) {
     session_start();
 }
 
+require_once 'sc_config.php';
+
 // The following fileds are MANDATORY for success
 if(
     isset(
@@ -35,11 +37,10 @@ if(
     && $_POST['callFromJS'] == 1
 ) {
     require_once 'SC_REST_API.php';
-    $apms_getter = new SC_REST_API();
     
     // when we want Session Token
     if(@$_POST['needST'] == 1) {
-        $apms_getter->get_session_token($_SESSION['SC_Variables'], true);
+        SC_REST_API::get_session_token($_SESSION['SC_Variables'], true);
     }
     // when we want APMs
     else {
@@ -48,7 +49,7 @@ if(
             $_SESSION['SC_Variables']['sc_country'] = $_POST['country'];
         }
         
-        $apms_getter->get_rest_apms($_SESSION['SC_Variables'], true);
+        SC_REST_API::get_rest_apms($_SESSION['SC_Variables'], true);
     }
 }
 elseif(

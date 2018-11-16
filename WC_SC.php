@@ -173,7 +173,7 @@ class WC_SC extends WC_Payment_Gateway
             'save_logs' => array(
                 'title' => __('Save logs', 'sc'),
                 'type' => 'checkbox',
-                'label' => __('Crate and save daily log files. This can help for debugging and catching bugs.', 'sc'),
+                'label' => __('Create and save daily log files. This can help for debugging and catching bugs.', 'sc'),
                 'default' => 'yes'
             ),
         );
@@ -488,7 +488,6 @@ class WC_SC extends WC_Payment_Gateway
             ));
             
             require_once 'SC_REST_API.php';
-            $rest_api = new SC_REST_API();
             
             // set the payment method type
             $payment_method = 'apm';
@@ -501,7 +500,7 @@ class WC_SC extends WC_Payment_Gateway
             $this->create_log($payment_method, 'payment method: ');
             
             // ALWAYS CHECK USED PARAMS IN process_payment
-            $resp = $rest_api->process_payment($params, $_SESSION['SC_Variables'], $_REQUEST['order-pay'], $payment_method);
+            $resp = SC_REST_API::process_payment($params, $_SESSION['SC_Variables'], $_REQUEST['order-pay'], $payment_method);
             
             $this->create_log($resp, 'REST API response: ');
             

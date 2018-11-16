@@ -1,17 +1,11 @@
 <?php
 
-if (!session_id()) {
-    session_start();
-}
-
-require_once 'sc_config.php';
-
 /**
  * SC_REST_API Class
  * 
  * A class for work with SafeCharge REST API.
  * 
- * 2018/10
+ * 2018
  *
  * @author SafeCharge
  */
@@ -27,7 +21,7 @@ class SC_REST_API
      * @params string $currency - used currency
      * @params string $notify_url
      */
-    public function sc_refund_order($settings, $refund, $order_meta_data, $currency, $notify_url)
+    public static function sc_refund_order($settings, $refund, $order_meta_data, $currency, $notify_url)
     {
         $refund_url = '';
         $cpanel_url = '';
@@ -37,7 +31,7 @@ class SC_REST_API
         
         $time = date('YmdHis', time());
         
-        $this->create_log($refund, 'Refund data: ');
+        self::create_log($refund, 'Refund data: ');
         
         try {
             $refund_url = SC_TEST_REFUND_URL;
@@ -91,18 +85,18 @@ class SC_REST_API
             );
         }
         
-        $this->create_log($refund_url, 'URL: ');
-        $this->create_log($ref_parameters, 'refund_parameters: ');
-        $this->create_log($other_params, 'other_params: ');
+        self::create_log($refund_url, 'URL: ');
+        self::create_log($ref_parameters, 'refund_parameters: ');
+        self::create_log($other_params, 'other_params: ');
         
-        $json_arr = $this->call_rest_api(
+        $json_arr = self::call_rest_api(
             $refund_url,
             $ref_parameters,
             $checksum,
             $other_params
         );
         
-        $this->create_log($json_arr, 'Refund Response: ');
+        self::create_log($json_arr, 'Refund Response: ');
         
         $note = '';
         $error_note = 'Please manually delete request Refund #'
@@ -187,7 +181,7 @@ class SC_REST_API
      * 
      * @return mixed
      */
-    public function call_rest_api($url, $checksum_params, $checksum, $other_params = array())
+    public static function call_rest_api($url, $checksum_params, $checksum, $other_params = array())
     {
         $resp = false;
         
@@ -201,7 +195,7 @@ class SC_REST_API
         }
         
         $json_post = json_encode($params);
-        $this->create_log($json_post, 'params as json: ');
+        self::create_log($json_post, 'params as json: ');
         
         try {
             $header =  array(
@@ -228,11 +222,11 @@ class SC_REST_API
             $resp = curl_exec($ch);
             curl_close ($ch);
             
-            $this->create_log($url, 'Call rest api URL: ');
-            $this->create_log($resp, 'Call rest api resp: ');
+            self::create_log($url, 'Call rest api URL: ');
+            self::create_log($resp, 'Call rest api resp: ');
         }
         catch(Exception $e) {
-            $this->create_log($e, 'Exception ERROR when call REST API: ');
+            self::create_log($e, 'Exception ERROR when call REST API: ');
             return false;
         }
         
@@ -252,21 +246,21 @@ class SC_REST_API
      * 
      * @return string - json
      */
-    public function get_rest_apms($data = array(), $is_ajax = false)
+    public static function get_rest_apms($data = array(), $is_ajax = false)
     {
         $checksum_params = array();
         $other_params = array();
         $resp_arr = array();
         
         // getSessionToken
-        $session_token_data = $this->get_session_token($data);
+        $session_token_data = self::get_session_token($data);
         
         if(
             !isset($session_token_data['sessionToken'])
             || empty($session_token_data['sessionToken'])
             || !is_string($session_token_data['sessionToken'])
         ) {
-            $this->create_log($session_token, 'Session Token is FALSE.');
+            self::create_log($session_token, 'Session Token is FALSE.');
             
             if($is_ajax) {
                 echo json_encode(array(
@@ -299,9 +293,9 @@ class SC_REST_API
                 'type'              => '', // optional
             );
             
-            $this->create_log('', 'Call REST API to get REST APMs: ');
+            self::create_log('', 'Call REST API to get REST APMs: ');
 
-            $resp_arr = $this->call_rest_api(
+            $resp_arr = self::call_rest_api(
                 $data['test'] == 'yes' ? SC_TEST_REST_PAYMENT_METHODS_URL : SC_LIVE_REST_PAYMENT_METHODS_URL,
                 $checksum_params,
                 $data['cs2'],
@@ -336,7 +330,7 @@ class SC_REST_API
      * 
      * @return array|bool
      */
-    public function process_payment($data, $sc_variables, $order_id, $payment_method)
+    public static function process_payment($data, $sc_variables, $order_id, $payment_method)
     {
         $resp = false;
         
@@ -404,7 +398,7 @@ class SC_REST_API
             switch ($payment_method) {
                 case 'apm':
                     // for D3D we use other token
-                    $session_token_data = $this->get_session_token($sc_variables);
+                    $session_token_data = self::get_session_token($sc_variables);
                     $session_token = @$session_token_data['sessionToken'];
 
                     if(!$session_token) {
@@ -425,7 +419,7 @@ class SC_REST_API
 
                     $params['sessionToken']     = $sc_variables['lst'];
                     $params['isDynamic3D']      = 1;
-                    $params['deviceDetails']    = $this->get_device_details();
+                    $params['deviceDetails']    = self::get_device_details();
                     $params['cardData']         = array(
                         'ccTempToken'       => $sc_variables['APM_data']['apm_fields']['ccCardNumber'],
                         'CVV'               => $sc_variables['APM_data']['apm_fields']['CVV'],
@@ -440,28 +434,28 @@ class SC_REST_API
                     return false;
             }
 
-            $this->create_log($params, 'Call REST API when Process Payment: ');
-            $this->create_log(
+            self::create_log($params, 'Call REST API when Process Payment: ');
+            self::create_log(
                 $sc_variables['merchantId'] . $sc_variables['merchantSiteId']
                     .$data['client_request_id'] . ((string) $data['total_amount'])
                     .$data['currency']. $data['time_stamp']
                 ,'Call REST API when Process Payment checksum string without the secret: '
             );
-            $this->create_log($data['checksum'], 'Checksum sent to REST: ');
+            self::create_log($data['checksum'], 'Checksum sent to REST: ');
 
-            $resp = $this->call_rest_api(
+            $resp = self::call_rest_api(
                 $endpoint_url,
                 $params,
                 $data['checksum']
             );
         }
         catch(Exception $e) {
-            $this->create_log($e, 'Process Payment Exception ERROR: ');
+            self::create_log($e, 'Process Payment Exception ERROR: ');
             return false;
         }
         
         if(!is_array($resp)) {
-            $this->create_log($resp, 'Process Payment response: ');
+            self::create_log($resp, 'Process Payment response: ');
             return false;
         }
         
@@ -478,10 +472,10 @@ class SC_REST_API
      * 
      * @return array|bool
      */
-    public function get_session_token($data, $is_ajax = false)
+    public static function get_session_token($data, $is_ajax = false)
     {
         if(!isset($data['merchantId'], $data['merchantSiteId'])) {
-            $this->create_log($data, 'Missing mandatory session variables: ');
+            self::create_log($data, 'Missing mandatory session variables: ');
             return false;
         }
         
@@ -496,20 +490,20 @@ class SC_REST_API
                 'timeStamp'         => current(explode('_', $data['cri1'])),
             );
 
-            $this->create_log(
+            self::create_log(
                 $data['test'] == 'yes' ? SC_TEST_SESSION_TOKEN_URL : SC_LIVE_SESSION_TOKEN_URL,
                 'Call REST API for Session Token with URL: '
             );
-            $this->create_log($params, 'Call REST API for Session Token with params: ');
+            self::create_log($params, 'Call REST API for Session Token with params: ');
 
-            $resp_arr = $this->call_rest_api(
+            $resp_arr = self::call_rest_api(
                 $data['test'] == 'yes' ? SC_TEST_SESSION_TOKEN_URL : SC_LIVE_SESSION_TOKEN_URL,
                 $params,
                 $data['cs1']
             );
         }
         catch(Exception $e) {
-            $this->create_log($e, 'Getting SessionToken Exception ERROR: ');
+            self::create_log($e, 'Getting SessionToken Exception ERROR: ');
             
             if($is_ajax) {
                 echo json_encode(array('status' => 0));
@@ -525,7 +519,7 @@ class SC_REST_API
             || !isset($resp_arr['status'])
             || $resp_arr['status'] != 'SUCCESS'
         ) {
-            $this->create_log($resp_arr, 'getting getSessionToken error: ');
+            self::create_log($resp_arr, 'getting getSessionToken error: ');
             
             if($is_ajax) {
                 echo json_encode(array('status' => 0));
@@ -551,7 +545,7 @@ class SC_REST_API
      * 
      * @return array $device_details
      */
-    private function get_device_details()
+    private static function get_device_details()
     {
         $device_details = array(
             'deviceType'    => 'UNKNOWN', // DESKTOP, SMARTPHONE, TABLET, TV, and UNKNOWN
@@ -640,7 +634,7 @@ class SC_REST_API
      * @param mixed $data
      * @param string $title - title of the printed log
      */
-    private function create_log($data, $title = '')
+    private static function create_log($data, $title = '')
     {
         if(
             !isset($_SESSION['SC_Variables']['save_logs'])
