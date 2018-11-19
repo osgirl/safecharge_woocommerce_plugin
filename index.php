@@ -170,6 +170,8 @@ function sc_create_refund()
     require_once 'WC_SC.php';
     $gateway = new WC_SC();
     
+    $notify_url = $gateway->set_notify_url();
+    
     // get order refunds
     $order = new WC_Order( (int)$_REQUEST['order_id'] );
     $refunds = $order->get_refunds();
@@ -195,7 +197,7 @@ function sc_create_refund()
         ,$refunds[0]->data
         ,$order_meta_data
         ,get_woocommerce_currency()
-        ,SC_NOTIFY_URL . 'Rest'
+        ,$notify_url . 'Rest'
     );
     
     $order -> add_order_note(__($resp['msg'], 'sc'));

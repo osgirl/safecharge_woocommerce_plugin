@@ -43,6 +43,7 @@ class WC_SC extends WC_Payment_Gateway
 		$this->merchantSiteId   = @$this->settings['merchantSiteId'] ? $this->settings['merchantSiteId'] : '';
         $this->secret           = @$this->settings['secret'] ? $this->settings['secret'] : '';
 		$this->test             = @$this->settings['test'] ? $this->settings['test'] : 'yes';
+		$this->use_http         = @$this->settings['use_http'] ? $this->settings['use_http'] : 'yes';
 		$this->show_thanks_msg  = @$this->settings['show_thanks_msg'] ? $this->settings['show_thanks_msg'] : 'no';
         $this->save_logs        = @$this->settings['save_logs'] ? $this->settings['save_logs'] : 'yes';
         $this->hash_type        = @$this->settings['hash_type'] ? $this->settings['hash_type'] : 'sha256';
@@ -164,6 +165,12 @@ class WC_SC extends WC_Payment_Gateway
                 'label' => __('Enable test mode', 'sc'),
                 'default' => 'no'
             ),
+            'use_http' => array(
+                'title' => __('Use HTTP', 'sc'),
+                'type' => 'checkbox',
+                'label' => __('Force protocol where receive DMNs to be HTTP. You must have valid certificate for HTTPS! In case the checkbox is not set the default Protocol will be used.', 'sc'),
+                'default' => 'no'
+            ),
             'show_thanks_msg' => array(
                 'title' => __('Show "Loading message"', 'sc'),
                 'type' => 'checkbox',
@@ -242,7 +249,9 @@ class WC_SC extends WC_Payment_Gateway
 		$items = $order->get_items();
 		$i = 1;
 		
-        $this->setEnvironment();
+        $this->set_environment();
+        
+        $notify_url = $this->set_notify_url();
         
         $params['site_url'] = get_site_url();
         // easy way to pass them to REST API
@@ -320,7 +329,7 @@ class WC_SC extends WC_Payment_Gateway
 		$params['pending_url']          = $this->get_return_url();
 		$params['error_url']            = $this->get_return_url();
 		$params['back_url']             = $payment_page;
-		$params['notify_url']           = SC_NOTIFY_URL . 'WC_Gateway_SC';
+		$params['notify_url']           = $notify_url . 'WC_Gateway_SC';
 		$params['invoice_id']           = $order_id.'_'.$TimeStamp;
 		$params['merchant_unique_id']   = $order_id.'_'.$TimeStamp;
         
@@ -474,7 +483,7 @@ class WC_SC extends WC_Payment_Gateway
                 'successUrl'        => $this->get_return_url(),
                 'failureUrl'        => $this->get_return_url(),
                 'pendingUrl'        => $this->get_return_url(),
-                'notificationUrl'   => SC_NOTIFY_URL . 'WC_SC_Rest'
+                'notificationUrl'   => $notify_url . 'WC_SC_Rest'
             );
                 
             $params['checksum'] = hash($this->settings['hash_type'], stripslashes(
@@ -755,7 +764,31 @@ class WC_SC extends WC_Payment_Gateway
             return false;
 	}
     
-    public function setEnvironment()
+    public function set_notify_url()
+    {
+        $protocol = '';
+        $url = $_SERVER['HTTP_HOST'] . '/?wc-api=';
+        
+        // force Notification URL protocol
+        if(isset($this->use_http) && $this->use_http == 'yes') {
+            $protocol = 'http://';
+        }
+        else {
+            if(
+                (isset($_SERVER["HTTPS"]) && !empty($_SERVER["HTTPS"]) && strtolower ($_SERVER['HTTPS']) != 'off')
+                || (isset($_SERVER["SERVER_PROTOCOL"]) && strpos($_SERVER["SERVER_PROTOCOL"], 'HTTPS/') !== false)
+            ) {
+                $protocol = 'https://';
+            }
+            elseif(isset($_SERVER["SERVER_PROTOCOL"]) && strpos($_SERVER["SERVER_PROTOCOL"], 'HTTP/') !== false) {
+                $protocol = 'http://';
+            }
+        }
+        
+        return $protocol . $url;
+    }
+    
+    private function set_environment()
     {
 		if ($this->test == 'yes'){
             $this->use_session_token_url    = SC_TEST_SESSION_TOKEN_URL;

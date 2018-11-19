@@ -400,7 +400,9 @@ class SC_REST_API
                     // for D3D we use other token
                     $session_token_data = self::get_session_token($sc_variables);
                     $session_token = @$session_token_data['sessionToken'];
-
+                    
+                    self::create_log($session_token_data, 'session_token_data: ');
+                    
                     if(!$session_token) {
                         return false;
                     }

@@ -42,6 +42,9 @@ Please, contact out Tech-Support team (tech-support@safecharge.com) in case of q
 
 == Changelog ==
 
+= 1.6.2 - 2018-11-19 =
+* New - The Merchant will have option to choose between HTTP and HTTPS protocol for its Notification URL.
+
 = 1.6.1 - 2018-11-16 =
 * New - Added more checks in SC_REST_API Class to prevent unexpected errors, code cleaned. The class was changed to static. Added new file sc_ajax.php to catch the Ajax call from the JS file.
 
