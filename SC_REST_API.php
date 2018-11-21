@@ -25,13 +25,13 @@ class SC_REST_API
     {
         $refund_url = '';
         $cpanel_url = '';
-        $settings = array();
         $ref_parameters = array();
         $other_params = array();
         
         $time = date('YmdHis', time());
         
         self::create_log($refund, 'Refund data: ');
+        self::create_log($settings, 'Refund Settings data: ');
         
         try {
             $refund_url = SC_TEST_REFUND_URL;
