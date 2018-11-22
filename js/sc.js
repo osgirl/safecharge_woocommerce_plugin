@@ -330,8 +330,6 @@ var billing_country_first_val = '';
  // when the admin select to Void the Order
  function cancelOrder(question) {
     if(confirm(question)) {
-        return;
-        
         jQuery.ajax({
             type: "POST",
             url: myAjax.ajaxurl,
@@ -342,18 +340,11 @@ var billing_country_first_val = '';
             dataType: 'json'
         })
             .done(function(resp){
-                if(resp.status == 1 && typeof resp.data != 'undefined') {
-                    payload.merchantSiteId = resp.data.merchantId;
-                    payload.sessionToken = resp.data.sessionToken;
-
-                    if(resp.data.test == 'yes') {
-                        payload.environment = 'test';
-                    }
-
-                    // get tokenization card number
-                    if(typeof Safecharge != 'undefined') {
-                        Safecharge.card.createToken(payload, safechargeResultHandler);
-                    }
+                if(resp.status == 1) {
+                    
+                }
+                else {
+                    
                 }
             });
     }

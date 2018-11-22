@@ -172,12 +172,17 @@ class SC_REST_API
     /**
      * function cancel_order
      * Cancel order via Void button.
-     * We call this method via Ajax request.
+     * If the Void is success we have to change the status of the Order to canceled.
+     * Use return_response() instead check $is_ajax each time.
      * 
      * @param array $data - all data for the void is here, pass it directly
+     * @param bool $is_ajax - is call coming via Ajax
      */
-    public static function cancel_order($data)
+    public static function cancel_order($data, $is_ajax = false)
     {
+        var_dump($data);
+        exit;
+        
         self::create_log($data, 'Input parameters for Void: ');
         $resp = false;
         
@@ -188,25 +193,74 @@ class SC_REST_API
                 $data,
                 $data['checksum']
             );
+            
+            
         }
         catch (Exception $ex) {
             self::create_log($e, 'Exception ERROR when call REST API: ');
-            echo json_encode(array(
-                'status' => 0,
-                'msg' => 'Exception ERROR when call REST API.')
+            
+            self::return_response(
+                array(
+                    'status' => 0,
+                    'msg' => 'Exception ERROR when call REST API.'
+                ),
+                $is_ajax
             );
-            exit;
         }
         
         if(!$resp) {
-            echo json_encode(array(
-                'status' => 0,
-                'msg' => 'Exception ERROR when call REST API.')
+            self::return_response(
+                array(
+                    'status' => 0,
+                    'msg' => 'API response ERROR.'
+                ),
+                $is_ajax
             );
-            exit;
         }
         
+        $resp_arr = json_decode($resp. true);
+        if(!is_array($resp_arr)) {
+            self::return_response(
+                array(
+                    'status' => 0,
+                    'msg' => 'API response ERROR - unexpected response format.'
+                ),
+                $is_ajax
+            );
+        }
         
+        if(@$resp_arr['status'] == 'ERROR') {
+            self::return_response(
+                array(
+                    'status' => 0,
+                    'msg' => 'API call returns status ERROR: ' . $resp_arr['reason']
+                ),
+                $is_ajax
+            );
+        }
+        
+        if(@$resp_arr['transactionStatus'] == 'ERROR') {
+            self::return_response(
+                array(
+                    'status' => 0,
+                    'msg' => 'Transaction ERROR: ' . $resp_arr['gwErrorReason']
+                ),
+                $is_ajax
+            );
+        }
+        
+        if(@$resp_arr['transactionStatus'] == 'DECLINED') {
+            self::return_response(
+                array(
+                    'status' => 0,
+                    'msg' => 'Canceling order was DECLINED: ' . $resp_arr['gwErrorReason']
+                ),
+                $is_ajax
+            );
+        }
+        
+        // the Cancel proccess was Approved, change the status of the Order
+        self::return_response(array('status' => 1), $is_ajax);
     }
     
     /**
@@ -661,6 +715,29 @@ class SC_REST_API
         $device_details['ipAddress'] = (string) $ip_address;
             
         return $device_details;
+    }
+    
+    /**
+     * Function return_response
+     * Help us to return the expected response, when have $is_ajax option
+     * for the method.
+     * 
+     * @param array $data
+     * @param bool $is_ajax
+     */
+    private static function return_response($data, $is_ajax = false)
+    {
+        if(!is_array($data)) {
+            self::create_log($data, 'The data passed to return_response() is not array: ');
+            return false;
+        }
+        
+        if($is_ajax) {
+            echo json_encode($data);
+            exit;
+        }
+        
+        return $data;
     }
     
     /**

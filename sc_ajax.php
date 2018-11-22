@@ -44,7 +44,7 @@ if(
     }
     // when merchant cancel the order via Void button
     if(isset($_POST['cancelOrder']) && $_POST['cancelOrder'] == 1) {
-        SC_REST_API::cancel_order($_SESSION['SC_Variables']);
+        SC_REST_API::cancel_order($_SESSION['SC_Variables'], true);
         unset($_SESSION['SC_Variables']);
     }
     // when we want APMs

@@ -48,30 +48,39 @@ function woocommerce_add_sc_gateway($methods)
 // first method we come in
 function sc_enqueue($hook)
 {
-    /*  Skip order status update if currentlly received status is 'pending' and curent order status is 'completed'.
-    * For the rest of the cases the status should be updated.   */
-    if(
-        isset($_REQUEST['wc-api'], $_REQUEST['Status'], $_REQUEST['invoice_id'])
-        && !empty($_REQUEST['wc-api'])
-        && !empty($_REQUEST['Status'])
-        && !empty($_REQUEST['invoice_id'])
-        && strtolower($_REQUEST['wc-api']) == 'wc_gateway_sc'
-    ) {
-        $arr = explode("_", $_REQUEST['invoice_id']);
+    # DMNs catch
+    if(isset($_REQUEST['wc-api']) && !empty($_REQUEST['wc-api'])) {
+        /* Cashier DMN
+         * Skip order status update if currentlly received status is 'pending' and curent order status is 'completed'.
+         * For the rest of the cases the status should be updated. 
+        */
+        if(
+            strtolower($_REQUEST['wc-api']) == 'wc_gateway_sc'
+            && isset($_REQUEST['Status'], $_REQUEST['invoice_id'])
+            && !empty($_REQUEST['Status'])
+            && !empty($_REQUEST['invoice_id'])
+        ) {
+            $arr = explode("_", $_REQUEST['invoice_id']);
 
-        if(is_array($arr) && $arr) {
-            $order_id  = $arr[0];
-            $order = new WC_Order($order_id);
+            if(is_array($arr) && $arr) {
+                $order_id  = $arr[0];
+                $order = new WC_Order($order_id);
 
-            if($order_id && $order && strtolower($_REQUEST['Status']) == 'pending') {
-                $order_status = strtolower($order->get_status());
+                if($order_id && $order && strtolower($_REQUEST['Status']) == 'pending') {
+                    $order_status = strtolower($order->get_status());
 
-                if ($order_status != 'completed') {
-                    $order->set_status($_REQUEST['Status']);
+                    if ($order_status != 'completed') {
+                        $order->set_status($_REQUEST['Status']);
+                    }
                 }
             }
         }
+        // REST API DMN
+        elseif(strtolower($_REQUEST['wc-api']) == 'rest') {
+            
+        }
     }
+    # DMNs catch END
     
     # load external files
     $plugin_dir = basename(dirname(__FILE__));
@@ -257,6 +266,7 @@ function sc_add_void_button()
             // optional fields for sc_ajax.php
             'test'                  => $wc_sc->settings['test'],
             'payment_api'           => 'rest',
+        //    'order_id'              => $_REQUEST['post'],
         );
         
         $checksum = hash(
