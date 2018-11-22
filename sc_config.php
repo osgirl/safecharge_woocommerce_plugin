@@ -41,6 +41,16 @@ else {
     define('SC_TEST_REFUND_URL', 'https://ppp-test.safecharge.com/ppp/api/v1/refundTransaction.do');
 }
 
+// void URLs
+define('SC_LIVE_VOID_URL', 'https://secure.safecharge.com/ppp/api/v1/voidTransaction.do');
+if(strpos(@$_SERVER['HTTP_HOST'], 'gw-4u.com') !== false || strpos(@$_SERVER['HTTP_HOST'], 'wordpress.mdev') !== false) {
+    define('SC_TEST_VOID_URL', 'https://192.168.103.237/ppp/api/v1/voidTransaction.do');
+//    define('SC_TEST_REFUND_URL', 'https://apmtest.gate2shop.com/ppp/api/v1/voidTransaction.do');
+}
+else {
+    define('SC_TEST_VOID_URL', 'https://ppp-test.safecharge.com/ppp/api/v1/voidTransaction.do');
+}
+
 // payment URLs
 define('SC_LIVE_PAYMENT_URL', 'https://secure.safecharge.com/ppp/api/v1/paymentAPM.do');
 if(strpos(@$_SERVER['HTTP_HOST'], 'gw-4u.com') !== false || strpos(@$_SERVER['HTTP_HOST'], 'wordpress.mdev') !== false) {

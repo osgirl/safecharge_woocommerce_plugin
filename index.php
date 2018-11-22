@@ -31,7 +31,9 @@ function woocommerce_sc_init()
 	add_action('woocommerce_thankyou_order_received_text', 'sc_show_final_text');
     add_action('woocommerce_create_refund', 'sc_create_refund');
     // Check checkout for selected apm ONLY when payment api is REST
-    add_action( 'woocommerce_checkout_process', 'sc_check_checkout_apm', 20 ) ;
+    add_action( 'woocommerce_checkout_process', 'sc_check_checkout_apm', 20 );
+    // add void button to completed orders
+    add_action( 'woocommerce_order_item_add_action_buttons', 'sc_add_void_button');
 }
 
 /**
@@ -192,7 +194,7 @@ function sc_create_refund()
     $sc_api = new SC_REST_API();
     
     // execute refund, the response must be array('msg' => 'some msg', 'new_order_status' => 'some status')
-    $resp = $sc_api->sc_refund_order(
+    $resp = $sc_api->refund_order(
         $gateway->settings
         ,$refunds[0]->data
         ,$order_meta_data
@@ -221,4 +223,56 @@ function sc_check_checkout_apm()
         $notice = __( 'Please select '. SC_GATEWAY_TITLE .' payment method to continue!', 'sc' );
         wc_add_notice( '<strong>' . $notice . '</strong>', 'error' );
     }
+}
+
+function sc_add_void_button()
+{
+    $order = new WC_Order($_REQUEST['post']);
+    $order_status = strtolower($order->get_status());
+    
+    if($order_status == 'completed') {
+        require_once 'WC_SC.php';
+        require_once 'SC_REST_API.php';
+        require_once 'SC_Versions_Resolver.php';
+        
+        $wc_sc = new WC_SC();
+        $sc_api = new SC_REST_API();
+        $sc_v_res = new SC_Versions_Resolver();
+        
+        $time = date('YmdHis', time());
+        $order_tr_id = $order->get_meta(SC_GW_TRANS_ID_KEY);
+        $notify_url = $wc_sc->set_notify_url();
+        
+        $_SESSION['SC_Variables'] = array(
+            'merchantId'            => $wc_sc->settings['merchantId'],
+            'merchantSiteId'        => $wc_sc->settings['merchantSiteId'],
+            'clientRequestId'       => $time . '_' . $order_tr_id,
+            'clientUniqueId'        => $order_tr_id,
+            'amount'                => $sc_v_res->get_order_data($order, 'order_total'),
+            'currency'              => get_woocommerce_currency(),
+            'relatedTransactionId'  => $order_tr_id,
+            'authCode'              => $order->get_meta(SC_AUTH_CODE_KEY),
+            'urlDetails'            => array('notificationUrl' => $notify_url . 'Rest'),
+            'timeStamp'             => $time,
+            // optional fields for sc_ajax.php
+            'test'                  => $wc_sc->settings['test'],
+            'payment_api'           => 'rest',
+        );
+        
+        $checksum = hash(
+            $wc_sc->settings['hash_type'],
+            $wc_sc->settings['merchantId'] . $wc_sc->settings['merchantSiteId']
+                .($time . '_' . $order_tr_id) . $order_tr_id . $_SESSION['SC_Variables']['amount']
+                .$_SESSION['SC_Variables']['currency'] . $order_tr_id
+                .$_SESSION['SC_Variables']['authCode'] . '' . ($notify_url . 'Rest')
+                .$time . $wc_sc->settings['secret']
+        );
+        
+        $_SESSION['SC_Variables']['checksum'] = $checksum;
+        
+        echo ' <button type="button" onclick="cancelOrder(\''
+            . __( 'Are you sure, you want to Cancel Order #'. $_REQUEST['post'] .'?', 'sc' )
+            .'\')" class="button generate-items">'. __( 'Void', 'sc' ) .'</button>';
+    }
+    //echo '<script>console.log("'.json_encode($_SESSION).'")</script>';
 }

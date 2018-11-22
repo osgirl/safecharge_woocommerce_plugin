@@ -12,7 +12,7 @@
 class SC_REST_API
 {
     /**
-     * Function sc_refund_order
+     * Function refund_order
      * Create a refund.
      * 
      * @params array $settings - the GW settings
@@ -21,7 +21,7 @@ class SC_REST_API
      * @params string $currency - used currency
      * @params string $notify_url
      */
-    public static function sc_refund_order($settings, $refund, $order_meta_data, $currency, $notify_url)
+    public static function refund_order($settings, $refund, $order_meta_data, $currency, $notify_url)
     {
         $refund_url = '';
         $cpanel_url = '';
@@ -170,6 +170,46 @@ class SC_REST_API
     }
     
     /**
+     * function cancel_order
+     * Cancel order via Void button.
+     * We call this method via Ajax request.
+     * 
+     * @param array $data - all data for the void is here, pass it directly
+     */
+    public static function cancel_order($data)
+    {
+        self::create_log($data, 'Input parameters for Void: ');
+        $resp = false;
+        
+        try {
+            // we get json or false
+            $resp = self::call_rest_api(
+                $data['test'] == 'no' ? SC_LIVE_VOID_URL : SC_TEST_VOID_URL,
+                $data,
+                $data['checksum']
+            );
+        }
+        catch (Exception $ex) {
+            self::create_log($e, 'Exception ERROR when call REST API: ');
+            echo json_encode(array(
+                'status' => 0,
+                'msg' => 'Exception ERROR when call REST API.')
+            );
+            exit;
+        }
+        
+        if(!$resp) {
+            echo json_encode(array(
+                'status' => 0,
+                'msg' => 'Exception ERROR when call REST API.')
+            );
+            exit;
+        }
+        
+        
+    }
+    
+    /**
      * Function call_rest_api
      * Call REST API with cURL post and get response.
      * The URL depends from the case.
@@ -203,11 +243,6 @@ class SC_REST_API
                 'Content-Length: ' . strlen($json_post),
             );
             
-            // fix for some servers
-//            if(strpos($url, 'paymentAPM.do') !== false) {
-//                $header[] = 'Expect: 100-continue';
-//            }
-
             // create cURL post
             $ch = curl_init();
 
@@ -223,7 +258,7 @@ class SC_REST_API
             curl_close ($ch);
             
             self::create_log($url, 'Call rest api URL: ');
-            self::create_log($resp, 'Call rest api resp: ');
+            self::create_log($resp, 'Call rest api response: ');
         }
         catch(Exception $e) {
             self::create_log($e, 'Exception ERROR when call REST API: ');

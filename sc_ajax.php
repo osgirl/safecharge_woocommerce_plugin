@@ -20,14 +20,14 @@ if(
         $_SERVER['HTTP_X_REQUESTED_WITH']
         ,$_SESSION['SC_Variables']['merchantId']
         ,$_SESSION['SC_Variables']['merchantSiteId']
-        ,$_SESSION['SC_Variables']['sc_country']
-        ,$_SESSION['SC_Variables']['currencyCode']
-        ,$_SESSION['SC_Variables']['languageCode']
+    //    ,$_SESSION['SC_Variables']['sc_country']
+    //    ,$_SESSION['SC_Variables']['currencyCode']
+    //    ,$_SESSION['SC_Variables']['languageCode']
         ,$_SESSION['SC_Variables']['payment_api']
-        ,$_SESSION['SC_Variables']['cs1']
-        ,$_SESSION['SC_Variables']['cs1']
-        ,$_SESSION['SC_Variables']['cri1']
-        ,$_SESSION['SC_Variables']['cri2']
+    //    ,$_SESSION['SC_Variables']['cs1']
+    //    ,$_SESSION['SC_Variables']['cs1']
+    //    ,$_SESSION['SC_Variables']['cri1']
+    //    ,$_SESSION['SC_Variables']['cri2']
         ,$_SESSION['SC_Variables']['test']
         ,$_POST['callFromJS']
     )
@@ -39,8 +39,13 @@ if(
     require_once 'SC_REST_API.php';
     
     // when we want Session Token
-    if(@$_POST['needST'] == 1) {
+    if(isset($_POST['needST']) && $_POST['needST'] == 1) {
         SC_REST_API::get_session_token($_SESSION['SC_Variables'], true);
+    }
+    // when merchant cancel the order via Void button
+    if(isset($_POST['cancelOrder']) && $_POST['cancelOrder'] == 1) {
+        SC_REST_API::cancel_order($_SESSION['SC_Variables']);
+        unset($_SESSION['SC_Variables']);
     }
     // when we want APMs
     else {

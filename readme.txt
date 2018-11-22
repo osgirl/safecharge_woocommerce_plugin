@@ -42,6 +42,9 @@ Please, contact out Tech-Support team (tech-support@safecharge.com) in case of q
 
 == Changelog ==
 
+= 1.7 - 2018-11-22 =
+* New - Option to cancel the order using Void button.
+
 = 1.6.2 - 2018-11-19 =
 * New - The Merchant will have option to force HTTP for the Notification URL.
 
