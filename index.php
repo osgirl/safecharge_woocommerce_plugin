@@ -80,27 +80,72 @@ function sc_enqueue($hook)
             // catch Void 
             if(
                 isset($_REQUEST['action'], $_REQUEST['clientRequestId'], $_REQUEST['Status'])
-                && $_REQUEST['action'] == 'void'
+                && @$_REQUEST['action'] == 'void'
                 && !empty($_REQUEST['clientRequestId'])
                 && !empty($_REQUEST['Status'])
                 && is_numeric($_REQUEST['clientRequestId'])
             ) {
                 $order = new WC_Order($_REQUEST['clientRequestId']);
-                $order_status = strtolower($order->get_status());
                 
-                // change order status to canceld
-                if(
-                    $_REQUEST['Status'] == 1
-                    && $order_status != 'canceled'
-                    && $order_status != 'cancelled'
-                ) {
-                    $order->add_order_note(__('Your Order #' . $_REQUEST['clientRequestId'] . ' was canceld.', 'sc'));
-                    $order->set_status('cancelled');
-                    $order->save();
+                if($order) {
+                    $order_status = strtolower($order->get_status());
+
+                    // change order status to canceld
+                    if(
+                        $_REQUEST['Status'] == 1
+                        && $order_status != 'canceled'
+                        && $order_status != 'cancelled'
+                    ) {
+                        $order->add_order_note(__('Your Order #' . $_REQUEST['clientRequestId'] . ' was canceld.', 'sc'));
+                        $order->set_status('cancelled');
+                        $order->save();
+                    }
+                    else {
+                        $order -> add_order_note(__('Your Order #' . $_REQUEST['clientRequestId'] . ' was not canceld!', 'sc'));
+                        $order->save();
+                    }
                 }
-                elseif($_REQUEST['Status'] == 2) {
-                    $order -> add_order_note(__('Your Order #' . $_REQUEST['clientRequestId'] . ' was not canceld!', 'sc'));
-                    $order->save();
+            }
+            // catch for Refund in case the API fail,
+            // see https://www.safecharge.com/docs/API/?json#refundTransaction -> Output Parameters
+            elseif(
+                @$_REQUEST['action'] == 'refund'
+                && !empty(@$_REQUEST['status'])
+                && is_numeric(@$_REQUEST['clientRequestId'])
+                && is_numeric(@$_REQUEST['order_id'])
+            ) {
+                $order = new WC_Order($_REQUEST['order_id']);
+                
+                if($order) {
+                    $order_status = strtolower($order->get_status());
+
+                    // change to Refund if request is Approved and the Order status is not Refunded
+                    if(
+                        $order_status !== 'refunded'
+                        && $_REQUEST['status'] == 'SUCCESS'
+                        && $_REQUEST['transactionStatus'] == 'APPROVED'
+                    ) {
+                        $order->set_status('refunded');
+                        $order -> add_order_note(__('Your request - Refund #' .
+                            $_REQUEST['clientRequestId'] . ', was successful.', 'sc'));
+                        
+                        $order->save();
+                    }
+                    elseif($_REQUEST['status'] == 'ERROR') {
+                        $order -> add_order_note(__('Request ERROR - ' . $_REQUEST['reason'] , 'sc'));
+                        
+                        $order->save();
+                    }
+                    elseif(
+                        $_REQUEST['transactionStatus'] == 'DECLINED'
+                        || $_REQUEST['transactionStatus'] == 'ERROR'
+                    ) {
+                        $order -> add_order_note(__('Request '
+                            .$_REQUEST['transactionStatus'] .' - '
+                            .$_REQUEST['gwErrorReason'] , 'sc'));
+                        
+                        $order->save();
+                    }
                 }
             }
         }
@@ -233,7 +278,7 @@ function sc_create_refund()
         ,$refunds[0]->data
         ,$order_meta_data
         ,get_woocommerce_currency()
-        ,$notify_url . 'Rest'
+        ,$notify_url . 'Rest&action=refund&order_id=' . $_REQUEST['order_id']
     );
     
     $order -> add_order_note(__($resp['msg'], 'sc'));
