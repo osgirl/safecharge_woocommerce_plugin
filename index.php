@@ -50,6 +50,8 @@ function sc_enqueue($hook)
 {
     # DMNs catch
     if(isset($_REQUEST['wc-api']) && !empty($_REQUEST['wc-api'])) {
+        create_log($_REQUEST, 'DMN receive with params: ');
+        
         /* Cashier DMN
          * Skip order status update if currentlly received status is 'pending' and curent order status is 'completed'.
          * For the rest of the cases the status should be updated. 
@@ -85,7 +87,6 @@ function sc_enqueue($hook)
                 && @$_REQUEST['action'] == 'void'
                 && !empty($_REQUEST['clientRequestId'])
                 && !empty($_REQUEST['Status'])
-                && is_numeric($_REQUEST['clientRequestId'])
             ) {
                 create_log($_REQUEST['clientRequestId'], 'sc_enqueue() Void DMN clientRequestId: ');
                 
@@ -114,11 +115,10 @@ function sc_enqueue($hook)
             // see https://www.safecharge.com/docs/API/?json#refundTransaction -> Output Parameters
             elseif(
                 @$_REQUEST['action'] == 'refund'
-                && !empty(@$_REQUEST['status'])
-                && is_numeric(@$_REQUEST['clientRequestId'])
-                && is_numeric(@$_REQUEST['order_id'])
+                && !empty(@$_REQUEST['Status'])
+                && !empty(@$_REQUEST['clientRequestId'])
+                && !empty(@$_REQUEST['order_id'])
             ) {
-                
                 create_log($_REQUEST['order_id'], 'sc_enqueue() Refund DMN order_id: ');
                 
                 $order = new WC_Order($_REQUEST['order_id']);
@@ -129,8 +129,8 @@ function sc_enqueue($hook)
                     // change to Refund if request is Approved and the Order status is not Refunded
                     if(
                         $order_status !== 'refunded'
-                        && $_REQUEST['status'] == 'SUCCESS'
-                        && $_REQUEST['transactionStatus'] == 'APPROVED'
+                        && $_REQUEST['Status'] == 'SUCCESS'
+                        && @$_REQUEST['transactionStatus'] == 'APPROVED'
                     ) {
                         $order->set_status('refunded');
                         $order -> add_order_note(__('Your request - Refund #' .
@@ -138,18 +138,18 @@ function sc_enqueue($hook)
                         
                         $order->save();
                     }
-                    elseif($_REQUEST['status'] == 'ERROR') {
-                        $order -> add_order_note(__('Request ERROR - ' . $_REQUEST['reason'] , 'sc'));
+                    elseif($_REQUEST['Status'] == 'ERROR') {
+                        $order -> add_order_note(__('Request ERROR - ' . @$_REQUEST['Reason'] , 'sc'));
                         
                         $order->save();
                     }
                     elseif(
-                        $_REQUEST['transactionStatus'] == 'DECLINED'
-                        || $_REQUEST['transactionStatus'] == 'ERROR'
+                        @$_REQUEST['transactionStatus'] == 'DECLINED'
+                        || @$_REQUEST['transactionStatus'] == 'ERROR'
                     ) {
                         $order -> add_order_note(__('Request '
                             .$_REQUEST['transactionStatus'] .' - '
-                            .$_REQUEST['gwErrorReason'] , 'sc'));
+                            .@$_REQUEST['gwErrorReason'] , 'sc'));
                         
                         $order->save();
                     }
@@ -157,6 +157,8 @@ function sc_enqueue($hook)
             }
         }
         
+        // stop script here or we will get code 400
+        echo 'DMN received.';
         exit;
     }
     # DMNs catch END
