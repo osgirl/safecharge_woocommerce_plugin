@@ -22,7 +22,8 @@ class SC_REST_API
      * @params string $notify_url
      */
     public static function refund_order($settings, $refund, $order_meta_data, $currency, $notify_url)
-    {
+    {echo 'test';
+    exit;
         $refund_url = '';
         $cpanel_url = '';
         $ref_parameters = array();
@@ -180,14 +181,11 @@ class SC_REST_API
      */
     public static function cancel_order($data, $is_ajax = false)
     {
-        var_dump($data);
-        exit;
-        
         self::create_log($data, 'Input parameters for Void: ');
         $resp = false;
         
         try {
-            // we get json or false
+            // we get array
             $resp = self::call_rest_api(
                 $data['test'] == 'no' ? SC_LIVE_VOID_URL : SC_TEST_VOID_URL,
                 $data,
@@ -218,8 +216,7 @@ class SC_REST_API
             );
         }
         
-        $resp_arr = json_decode($resp. true);
-        if(!is_array($resp_arr)) {
+        if(!is_array($resp)) {
             self::return_response(
                 array(
                     'status' => 0,
@@ -229,31 +226,31 @@ class SC_REST_API
             );
         }
         
-        if(@$resp_arr['status'] == 'ERROR') {
+        if($resp['status'] == 'ERROR') {
             self::return_response(
                 array(
                     'status' => 0,
-                    'msg' => 'API call returns status ERROR: ' . $resp_arr['reason']
+                    'msg' => 'API call returns status ERROR: ' . $resp['reason']
                 ),
                 $is_ajax
             );
         }
         
-        if(@$resp_arr['transactionStatus'] == 'ERROR') {
+        if(@$resp['transactionStatus'] == 'ERROR') {
             self::return_response(
                 array(
                     'status' => 0,
-                    'msg' => 'Transaction ERROR: ' . $resp_arr['gwErrorReason']
+                    'msg' => 'Transaction ERROR: ' . $resp['gwErrorReason']
                 ),
                 $is_ajax
             );
         }
         
-        if(@$resp_arr['transactionStatus'] == 'DECLINED') {
+        if(@$resp['transactionStatus'] == 'DECLINED') {
             self::return_response(
                 array(
                     'status' => 0,
-                    'msg' => 'Canceling order was DECLINED: ' . $resp_arr['gwErrorReason']
+                    'msg' => 'Canceling order was DECLINED: ' . $resp['gwErrorReason']
                 ),
                 $is_ajax
             );

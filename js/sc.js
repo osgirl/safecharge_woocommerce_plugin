@@ -328,8 +328,10 @@ var billing_country_first_val = '';
  }
  
  // when the admin select to Void the Order
- function cancelOrder(question) {
+ function cancelOrder(question, orderId) {
     if(confirm(question)) {
+        jQuery('#custom_loader').show();
+        
         jQuery.ajax({
             type: "POST",
             url: myAjax.ajaxurl,
@@ -339,12 +341,23 @@ var billing_country_first_val = '';
             },
             dataType: 'json'
         })
-            .done(function(resp){
-                if(resp.status == 1) {
-                    
-                }
-                else {
-                    
+            .done(function(resp) {
+                // go to DMN page to change order status
+                if(
+                    typeof resp.status != 'undefined'
+                    && (resp.status == 1 || resp.status == 0)
+                ) {
+                    // call DMN page:
+                    jQuery.ajax({
+                        url: '//' + window.location.host +'/?wc-api=Rest&action=void&Status='
+                            +resp.status +'&clientRequestId='+ orderId,
+                        dataType: 'text'
+                    })
+                        .complete(function(){
+                            jQuery('#custom_loader').hide();
+                            alert('You will be redirected to Orders list.')
+                            window.location = '//' + window.location.host + '/wp-admin/edit.php?post_type=shop_order';
+                        })
                 }
             });
     }

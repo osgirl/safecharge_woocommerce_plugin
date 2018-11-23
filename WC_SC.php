@@ -720,8 +720,8 @@ class WC_SC extends WC_Payment_Gateway
 
                 if (
                     $transactionType == 'Void'
-                    || $transactionType=='Chargeback'
-                    || $transactionType=='Credit'
+                    || $transactionType == 'Chargeback'
+                    || $transactionType == 'Credit'
                 ) {
                     $status = 'CANCELED';
                 }

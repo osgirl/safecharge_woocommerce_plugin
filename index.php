@@ -24,7 +24,7 @@ function woocommerce_sc_init()
         return;
     }
     
-    include_once 'WC_SC.php';
+    require_once 'WC_SC.php';
  
     add_filter('woocommerce_payment_gateways', 'woocommerce_add_sc_gateway' );
 	add_action('init', 'sc_enqueue');
@@ -77,7 +77,32 @@ function sc_enqueue($hook)
         }
         // REST API DMN
         elseif(strtolower($_REQUEST['wc-api']) == 'rest') {
-            
+            // catch Void 
+            if(
+                isset($_REQUEST['action'], $_REQUEST['clientRequestId'], $_REQUEST['Status'])
+                && $_REQUEST['action'] == 'void'
+                && !empty($_REQUEST['clientRequestId'])
+                && !empty($_REQUEST['Status'])
+                && is_numeric($_REQUEST['clientRequestId'])
+            ) {
+                $order = new WC_Order($_REQUEST['clientRequestId']);
+                $order_status = strtolower($order->get_status());
+                
+                // change order status to canceld
+                if(
+                    $_REQUEST['Status'] == 1
+                    && $order_status != 'canceled'
+                    && $order_status != 'cancelled'
+                ) {
+                    $order->add_order_note(__('Your Order #' . $_REQUEST['clientRequestId'] . ' was canceld.', 'sc'));
+                    $order->set_status('cancelled');
+                    $order->save();
+                }
+                elseif($_REQUEST['Status'] == 2) {
+                    $order -> add_order_note(__('Your Order #' . $_REQUEST['clientRequestId'] . ' was not canceld!', 'sc'));
+                    $order->save();
+                }
+            }
         }
     }
     # DMNs catch END
@@ -261,12 +286,15 @@ function sc_add_void_button()
             'currency'              => get_woocommerce_currency(),
             'relatedTransactionId'  => $order_tr_id,
             'authCode'              => $order->get_meta(SC_AUTH_CODE_KEY),
-            'urlDetails'            => array('notificationUrl' => $notify_url . 'Rest'),
+            
+            'urlDetails'            => array('notificationUrl' => $notify_url
+                .'Rest&action=void&clientRequestId=' . $_REQUEST['post']),
+            
             'timeStamp'             => $time,
             // optional fields for sc_ajax.php
             'test'                  => $wc_sc->settings['test'],
             'payment_api'           => 'rest',
-        //    'order_id'              => $_REQUEST['post'],
+            'save_logs'             => $wc_sc->settings['save_logs'],
         );
         
         $checksum = hash(
@@ -274,15 +302,17 @@ function sc_add_void_button()
             $wc_sc->settings['merchantId'] . $wc_sc->settings['merchantSiteId']
                 .($time . '_' . $order_tr_id) . $order_tr_id . $_SESSION['SC_Variables']['amount']
                 .$_SESSION['SC_Variables']['currency'] . $order_tr_id
-                .$_SESSION['SC_Variables']['authCode'] . '' . ($notify_url . 'Rest')
+                .$_SESSION['SC_Variables']['authCode']
+                .$_SESSION['SC_Variables']['urlDetails']['notificationUrl']
                 .$time . $wc_sc->settings['secret']
         );
         
         $_SESSION['SC_Variables']['checksum'] = $checksum;
         
-        echo ' <button type="button" onclick="cancelOrder(\''
-            . __( 'Are you sure, you want to Cancel Order #'. $_REQUEST['post'] .'?', 'sc' )
-            .'\')" class="button generate-items">'. __( 'Void', 'sc' ) .'</button>';
+        echo
+            ' <button type="button" onclick="cancelOrder(\''
+            . __( 'Are you sure, you want to Cancel Order #'. $_REQUEST['post'] .'?', 'sc' ) .'\', '
+            . $_REQUEST['post'] .')" class="button generate-items">'. __( 'Void', 'sc' ) .'</button>'
+            .'<div id="custom_loader" class="blockUI blockOverlay"></div>';
     }
-    //echo '<script>console.log("'.json_encode($_SESSION).'")</script>';
 }

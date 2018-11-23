@@ -20,21 +20,15 @@ if(
         $_SERVER['HTTP_X_REQUESTED_WITH']
         ,$_SESSION['SC_Variables']['merchantId']
         ,$_SESSION['SC_Variables']['merchantSiteId']
-    //    ,$_SESSION['SC_Variables']['sc_country']
-    //    ,$_SESSION['SC_Variables']['currencyCode']
-    //    ,$_SESSION['SC_Variables']['languageCode']
         ,$_SESSION['SC_Variables']['payment_api']
-    //    ,$_SESSION['SC_Variables']['cs1']
-    //    ,$_SESSION['SC_Variables']['cs1']
-    //    ,$_SESSION['SC_Variables']['cri1']
-    //    ,$_SESSION['SC_Variables']['cri2']
         ,$_SESSION['SC_Variables']['test']
         ,$_POST['callFromJS']
     )
-    && $_SESSION['SC_Variables']['payment_api'] == 'rest'
     && $_SERVER['HTTP_X_REQUESTED_WITH'] == 'XMLHttpRequest'
     // set shis param in JS call to separate JS call from simple class load
-    && $_POST['callFromJS'] == 1
+//    && $_POST['callFromJS'] == 1
+    // when we cancel order we no need to use rest as value for the payment_api
+    && ($_SESSION['SC_Variables']['payment_api'] == 'rest' || isset($_POST['cancelOrder']))
 ) {
     require_once 'SC_REST_API.php';
     
