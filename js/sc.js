@@ -350,10 +350,10 @@ var billing_country_first_val = '';
                     // call DMN page:
                     jQuery.ajax({
                         url: '//' + window.location.host +'/?wc-api=Rest&action=void&Status='
-                            +resp.status +'&clientRequestId='+ orderId,
+                            +resp.status +'&clientRequestId='+ orderId +'&msg='+ resp.msg,
                         dataType: 'text'
                     })
-                        .complete(function(){
+                        .complete(function(resp){
                             jQuery('#custom_loader').hide();
                             alert('You will be redirected to Orders list.')
                             window.location = '//' + window.location.host + '/wp-admin/edit.php?post_type=shop_order';

@@ -55,7 +55,7 @@ class SC_REST_API
                 'merchantId'            => $settings['merchantId'],
                 'merchantSiteId'        => $settings['merchantSiteId'],
                 'clientRequestId'       => $time . '_' . $ord_tr_id,
-                'clientUniqueId'        => $ord_tr_id,
+                'clientUniqueId'        => $refund['id'],
                 'amount'                => number_format($refund['amount'], 2),
                 'currency'              => $currency,
                 'relatedTransactionId'  => $ord_tr_id, // GW Transaction ID
@@ -103,7 +103,7 @@ class SC_REST_API
             .$refund['id'].' form the order or login into <i>'. $cpanel_url
             .'</i> and refund Transaction ID '.$ord_tr_id;
         
-        if($json_arr === false){
+        if($json_arr === false) {
             return array(
                 'msg' => 'The REST API retun false. ' . $error_note,
                 'new_order_status' => ''
@@ -256,7 +256,7 @@ class SC_REST_API
         }
         
         // the Cancel proccess was Approved, change the status of the Order
-        self::return_response(array('status' => 1), $is_ajax);
+        self::return_response(array('status' => 1, 'msg' => ''), $is_ajax);
     }
     
     /**

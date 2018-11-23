@@ -83,15 +83,11 @@ function sc_enqueue($hook)
         elseif(strtolower($_REQUEST['wc-api']) == 'rest') {
             // catch Void 
             if(
-                isset($_REQUEST['action'], $_REQUEST['clientRequestId'], $_REQUEST['Status'])
-                && @$_REQUEST['action'] == 'void'
-                && !empty($_REQUEST['clientRequestId'])
-                && !empty($_REQUEST['Status'])
+                @$_REQUEST['action'] == 'void'
+                && !empty(@$_REQUEST['clientRequestId'])
+                && (@$_REQUEST['Status'] == 1 || @$_REQUEST['Status'] == 0)
             ) {
-                create_log($_REQUEST['clientRequestId'], 'sc_enqueue() Void DMN clientRequestId: ');
-                
                 $order = new WC_Order($_REQUEST['clientRequestId']);
-                
                 if($order) {
                     $order_status = strtolower($order->get_status());
 
@@ -101,14 +97,22 @@ function sc_enqueue($hook)
                         && $order_status != 'canceled'
                         && $order_status != 'cancelled'
                     ) {
-                        $order->add_order_note(__('Your Order #' . $_REQUEST['clientRequestId'] . ' was canceld.', 'sc'));
+                        $order->add_order_note(__('DMN message: Your Void request was succesw, Order #'
+                            .$_REQUEST['clientRequestId'] . ' was canceld.', 'sc'));
+                        
                         $order->set_status('cancelled');
                         $order->save();
                     }
                     else {
-                        $order -> add_order_note(__('Your Order #' . $_REQUEST['clientRequestId'] . ' was not canceld!', 'sc'));
+                        $order -> add_order_note(__('DMN message: Your Void request fail with message: "'
+                            .@$_REQUEST['msg'] .'". Order #'  . $_REQUEST['clientRequestId']
+                            .' was not canceld!', 'sc'));
+                        
                         $order->save();
                     }
+                }
+                else {
+                    echo 'There is no Order. ';
                 }
             }
             // catch for Refund in case the API fail,
@@ -116,11 +120,9 @@ function sc_enqueue($hook)
             elseif(
                 @$_REQUEST['action'] == 'refund'
                 && !empty(@$_REQUEST['Status'])
-                && !empty(@$_REQUEST['clientRequestId'])
+                && !empty(@$_REQUEST['clientUniqueId'])
                 && !empty(@$_REQUEST['order_id'])
             ) {
-                create_log($_REQUEST['order_id'], 'sc_enqueue() Refund DMN order_id: ');
-                
                 $order = new WC_Order($_REQUEST['order_id']);
                 
                 if($order) {
@@ -133,13 +135,15 @@ function sc_enqueue($hook)
                         && @$_REQUEST['transactionStatus'] == 'APPROVED'
                     ) {
                         $order->set_status('refunded');
-                        $order -> add_order_note(__('Your request - Refund #' .
-                            $_REQUEST['clientRequestId'] . ', was successful.', 'sc'));
+                        $order -> add_order_note(__('DMN message: Your request - Refund #' .
+                            $_REQUEST['clientUniqueId'] . ', was successful.', 'sc'));
                         
                         $order->save();
                     }
                     elseif($_REQUEST['Status'] == 'ERROR') {
-                        $order -> add_order_note(__('Request ERROR - ' . @$_REQUEST['Reason'] , 'sc'));
+                        $order -> add_order_note(__('DMN message: Your try to Refund #'
+                            .$_REQUEST['clientUniqueId'] . ' faild with ERROR: "'
+                            . @$_REQUEST['Reason'] . '".' , 'sc'));
                         
                         $order->save();
                     }
@@ -147,12 +151,15 @@ function sc_enqueue($hook)
                         @$_REQUEST['transactionStatus'] == 'DECLINED'
                         || @$_REQUEST['transactionStatus'] == 'ERROR'
                     ) {
-                        $order -> add_order_note(__('Request '
-                            .$_REQUEST['transactionStatus'] .' - '
-                            .@$_REQUEST['gwErrorReason'] , 'sc'));
+                        $order -> add_order_note(__('DMN message: Your try to Refund #'
+                            .$_REQUEST['clientUniqueId'] . ' faild with ERROR: "'
+                            .@$_REQUEST['gwErrorReason'] . '".' , 'sc'));
                         
                         $order->save();
                     }
+                }
+                else {
+                    echo 'There is no Order. ';
                 }
             }
         }
