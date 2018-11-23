@@ -100,7 +100,7 @@ function sc_enqueue($hook)
                         $order->add_order_note(__('DMN message: Your Void request was succesw, Order #'
                             .$_REQUEST['clientRequestId'] . ' was canceld.', 'sc'));
                         
-                        $order->set_status('cancelled');
+                        $order->update_status('cancelled');
                         $order->save();
                     }
                     else {
@@ -134,7 +134,7 @@ function sc_enqueue($hook)
                         && $_REQUEST['Status'] == 'SUCCESS'
                         && @$_REQUEST['transactionStatus'] == 'APPROVED'
                     ) {
-                        $order->set_status('refunded');
+                        $order->update_status('refunded');
                         $order -> add_order_note(__('DMN message: Your request - Refund #' .
                             $_REQUEST['clientUniqueId'] . ', was successful.', 'sc'));
                         
