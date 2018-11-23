@@ -60,6 +60,8 @@ function sc_enqueue($hook)
             && !empty($_REQUEST['Status'])
             && !empty($_REQUEST['invoice_id'])
         ) {
+            create_log($_REQUEST['invoice_id'], 'sc_enqueue() Cashier DMN invoice_id: ');
+            
             $arr = explode("_", $_REQUEST['invoice_id']);
 
             if(is_array($arr) && $arr) {
@@ -85,6 +87,8 @@ function sc_enqueue($hook)
                 && !empty($_REQUEST['Status'])
                 && is_numeric($_REQUEST['clientRequestId'])
             ) {
+                create_log($_REQUEST['clientRequestId'], 'sc_enqueue() Void DMN clientRequestId: ');
+                
                 $order = new WC_Order($_REQUEST['clientRequestId']);
                 
                 if($order) {
@@ -114,6 +118,9 @@ function sc_enqueue($hook)
                 && is_numeric(@$_REQUEST['clientRequestId'])
                 && is_numeric(@$_REQUEST['order_id'])
             ) {
+                
+                create_log($_REQUEST['order_id'], 'sc_enqueue() Refund DMN order_id: ');
+                
                 $order = new WC_Order($_REQUEST['order_id']);
                 
                 if($order) {
@@ -149,6 +156,8 @@ function sc_enqueue($hook)
                 }
             }
         }
+        
+        exit;
     }
     # DMNs catch END
     
@@ -360,4 +369,52 @@ function sc_add_void_button()
             . $_REQUEST['post'] .')" class="button generate-items">'. __( 'Void', 'sc' ) .'</button>'
             .'<div id="custom_loader" class="blockUI blockOverlay"></div>';
     }
+}
+
+/**
+* Function create_log
+* Create logs. You MUST have defined SC_LOG_FILE_PATH const,
+* holding the full path to the log file.
+* 
+* @param mixed $data
+* @param string $title - title of the printed log
+*/
+function create_log($data, $title = '')
+{
+   if(
+       !isset($_SESSION['SC_Variables']['save_logs'])
+       || $_SESSION['SC_Variables']['save_logs'] == 'no'
+       || $_SESSION['SC_Variables']['save_logs'] === null
+   ) {
+       return;
+   }
+
+   $d = '';
+
+   if(is_array($data) || is_object($data)) {
+       $d = print_r($data, true);
+   }
+   elseif(is_bool($data)) {
+       $d = $data ? 'true' : 'false';
+   }
+   else {
+       $d = $data;
+   }
+
+   if(!empty($title)) {
+       $d = $title . "\r\n" . $d;
+   }
+
+   if(defined('SC_LOG_FILE_PATH')) {
+       try {
+           file_put_contents(SC_LOG_FILE_PATH, date('H:i:s') . ': ' . $d . "\r\n"."\r\n", FILE_APPEND);
+       }
+       catch (Exception $exc) {
+           echo
+               '<script>'
+                   .'error.log("Log file was not created, by reason: '.$exc.'");'
+                   .'console.log("Log file was not created, by reason: '.$data.'");'
+               .'</script>';
+       }
+   }
 }

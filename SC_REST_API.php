@@ -22,8 +22,7 @@ class SC_REST_API
      * @params string $notify_url
      */
     public static function refund_order($settings, $refund, $order_meta_data, $currency, $notify_url)
-    {echo 'test';
-    exit;
+    {
         $refund_url = '';
         $cpanel_url = '';
         $ref_parameters = array();

@@ -839,11 +839,17 @@ class WC_SC extends WC_Payment_Gateway
      */
     private function change_order_status($order, $order_id, $status, $transactionType)
     {
+        create_log($status . ' - ' . $order_id, 'WC_SC change_order_status() status-order: ');
+        
         global $woocommerce;
         
         switch($status) {
             case 'CANCELED':
-                $message = 'Payment status changed to:' .$transactionType. '. PPP_TransactionID = '. @$_REQUEST['PPP_TransactionID']. ", Status = " .$status. ', GW_TransactionID = '. @$_REQUEST['TransactionID'];
+                $message = 'Payment status changed to:' .$transactionType
+                    .'. PPP_TransactionID = '. @$_REQUEST['PPP_TransactionID']
+                    .", Status = " .$status. ', GW_TransactionID = '
+                    .@$_REQUEST['TransactionID'];
+                
                 $this->msg['message'] = $message;
                 $this->msg['class'] = 'woocommerce_message';
                 $order->update_status('failed');
@@ -852,20 +858,31 @@ class WC_SC extends WC_Payment_Gateway
             break;
 
             case 'APPROVED':
-                $message ='The amount has been authorized and captured by '. SC_GATEWAY_TITLE .'. PPP_TransactionID = '. @$_REQUEST['PPP_TransactionID'] .", Status = ". $status .", TransactionType = ". $transactionType .', GW_TransactionID = '. @$_REQUEST['TransactionID'];
+                $message ='The amount has been authorized and captured by '
+                    .SC_GATEWAY_TITLE .'. PPP_TransactionID = '
+                    .@$_REQUEST['PPP_TransactionID'] .", Status = ". $status
+                    .", TransactionType = ". $transactionType
+                    .', GW_TransactionID = '. @$_REQUEST['TransactionID'];
+                
                 $this->msg['message'] = $message;
                 $this->msg['class'] = 'woocommerce_message';
                 $order->payment_complete($order_id);
 
                 $order->update_status( 'completed' );
-                $order->add_order_note(SC_GATEWAY_TITLE .' payment is successful<br/>Unique Id: '. @$_REQUEST['PPP_TransactionID']);
+                $order->add_order_note(SC_GATEWAY_TITLE .' payment is successful<br/>Unique Id: '
+                    .@$_REQUEST['PPP_TransactionID']);
+                
                 $order->add_order_note($this->msg['message']);
                 $woocommerce->cart->empty_cart();
             break;
 
             case 'ERROR':
             case 'DECLINED':
-                $message ='Payment failed. PPP_TransactionID = '. @$_REQUEST['PPP_TransactionID'] .", Status = ". $status .", Error code = ". @$_REQUEST['ErrCode'] .", Message = ". @$_REQUEST['message'] .", TransactionType = ". $transactionType .', GW_TransactionID = '. $_REQUEST['TransactionID'];
+                $message ='Payment failed. PPP_TransactionID = '. @$_REQUEST['PPP_TransactionID']
+                    .", Status = ". $status .", Error code = ". @$_REQUEST['ErrCode']
+                    .", Message = ". @$_REQUEST['message'] .", TransactionType = "
+                    .$transactionType .', GW_TransactionID = '. $_REQUEST['TransactionID'];
+                
                 $this->msg['message'] = $message;
                 $this->msg['class'] = 'woocommerce_message';
                 $order->update_status('failed');
@@ -879,10 +896,16 @@ class WC_SC extends WC_Payment_Gateway
                     break;
                 }
                 
-                $message ='Payment is still pending, PPP_TransactionID '. @$_REQUEST['PPP_TransactionID'] .", Status = ". $status .", TransactionType = ". $transactionType .', GW_TransactionID = '. @$_REQUEST['TransactionID'];
+                $message ='Payment is still pending, PPP_TransactionID '
+                    .@$_REQUEST['PPP_TransactionID'] .", Status = ". $status
+                    .", TransactionType = ". $transactionType
+                    .', GW_TransactionID = '. @$_REQUEST['TransactionID'];
+                
                 $this->msg['message'] = $message;
                 $this->msg['class'] = 'woocommerce_message woocommerce_message_info';
-                $order->add_order_note(SC_GATEWAY_TITLE .' payment status is pending<br/>Unique Id: '. @$_REQUEST['PPP_TransactionID']);
+                $order->add_order_note(SC_GATEWAY_TITLE .' payment status is pending<br/>Unique Id: '
+                    .@$_REQUEST['PPP_TransactionID']);
+                
                 $order->add_order_note($this->msg['message']);
                 $order->update_status('on-hold');
                 $woocommerce->cart->empty_cart();
