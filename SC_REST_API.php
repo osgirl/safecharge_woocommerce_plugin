@@ -407,6 +407,7 @@ class SC_REST_API
     
     /**
      * Function process_payment
+     * Here are the different payment methods
      * 
      * @param array $data - contains the checksum
      * @param array $sc_variables
@@ -544,6 +545,20 @@ class SC_REST_API
         if(!is_array($resp)) {
             self::create_log($resp, 'Process Payment response: ');
             return false;
+        }
+        
+        // for D3D we have 3 cases
+        if($payment_method == 'd3d' && $params['isDynamic3D'] == 1) {
+            // case 1
+            if(isset($resp['acsUrl']) && $resp['acsUrl'] != '') {
+                if(isset($resp['threeDFlow']) && intval($resp['threeDFlow']) == 1) {
+                    
+                }
+            }
+            // case 2 and 3
+            else {
+                
+            }
         }
         
         return $resp;

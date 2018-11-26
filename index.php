@@ -32,8 +32,8 @@ function woocommerce_sc_init()
     add_action('woocommerce_create_refund', 'sc_create_refund');
     // Check checkout for selected apm ONLY when payment api is REST
     add_action( 'woocommerce_checkout_process', 'sc_check_checkout_apm', 20 );
-    // add void button to completed orders
-    add_action( 'woocommerce_order_item_add_action_buttons', 'sc_add_void_button');
+    // add void and/or settle buttons to completed orders
+    add_action( 'woocommerce_order_item_add_action_buttons', 'sc_add_buttons');
 }
 
 /**
@@ -322,12 +322,13 @@ function sc_check_checkout_apm()
     }
 }
 
-function sc_add_void_button()
+function sc_add_buttons()
 {
     $order = new WC_Order($_REQUEST['post']);
     $order_status = strtolower($order->get_status());
     
     if($order_status == 'completed') {
+        # Data for the VOID
         require_once 'WC_SC.php';
         require_once 'SC_REST_API.php';
         require_once 'SC_Versions_Resolver.php';
@@ -371,12 +372,22 @@ function sc_add_void_button()
         );
         
         $_SESSION['SC_Variables']['checksum'] = $checksum;
+        # Data for the VOID END
         
-        echo
+        $buttons_html = 
             ' <button type="button" onclick="cancelOrder(\''
             . __( 'Are you sure, you want to Cancel Order #'. $_REQUEST['post'] .'?', 'sc' ) .'\', '
-            . $_REQUEST['post'] .')" class="button generate-items">'. __( 'Void', 'sc' ) .'</button>'
-            .'<div id="custom_loader" class="blockUI blockOverlay"></div>';
+            . $_REQUEST['post'] .')" class="button generate-items">'. __( 'Void', 'sc' ) .'</button>';
+        
+        if($wc_sc->settings['transaction_type'] == 'a&s') {
+            $buttons_html .=
+                ' <button type="button" onclick="alert(\'no action for the moment.\')" class="button generate-items">'. __( 'Settle', 'sc' ) .'</button>';
+        }
+        
+        $buttons_html .=
+            '<div id="custom_loader" class="blockUI blockOverlay"></div>';
+        
+        echo $buttons_html;
     }
 }
 

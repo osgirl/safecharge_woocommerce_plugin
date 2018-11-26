@@ -58,7 +58,7 @@ var billing_country_first_val = '';
             
             var payload = {
                 merchantSiteId: '',
-            //    environment:    '',
+                // we set environment only if its test
                 sessionToken:   '',
                 billingAddress: {
                     city:       jQuery('#billing_city').val(),
@@ -67,7 +67,6 @@ var billing_country_first_val = '';
                     email:      jQuery("#billing_email").val(),
                     firstName:  jQuery("#billing_first_name").val(),
                     lastName:   jQuery("#billing_last_name").val(),
-                //    state:      jQuery("#billing_state").val()
                 },
                 cardData: {
                     cardNumber:         jQuery('#' + selectedPM + '_' + tokAPMsFields.cardNumber).val(),
@@ -111,7 +110,13 @@ var billing_country_first_val = '';
     }
  }
  
- // handler for tokenization result
+ /**
+  * Function safechargeResultHandler
+  * This function is just a handler for createToken method.
+  * It just replaces the card number with a token.
+  * 
+  * @param {object} resp
+  */
  function safechargeResultHandler(resp) {
     if(resp.status == 'ERROR') {
         jQuery('#custom_loader').hide();

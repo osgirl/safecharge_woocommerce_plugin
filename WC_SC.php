@@ -48,6 +48,7 @@ class WC_SC extends WC_Payment_Gateway
         $this->save_logs        = @$this->settings['save_logs'] ? $this->settings['save_logs'] : 'yes';
         $this->hash_type        = @$this->settings['hash_type'] ? $this->settings['hash_type'] : 'sha256';
 		$this->payment_api      = @$this->settings['payment_api'] ? $this->settings['payment_api'] : 'cashier';
+		$this->transaction_type = @$this->settings['transaction_type'] ? $this->settings['transaction_type'] : 'a&s';
         
         # set session variables for REST API, according REST variables names
         $_SESSION['SC_Variables']['merchantId']         = $this->merchantId;
@@ -157,6 +158,15 @@ class WC_SC extends WC_Payment_Gateway
                 'options' => array(
                     'cashier' => 'Cashier',
                     'rest' => 'REST API',
+                )
+            ),
+            'transaction_type' => array(
+                'title' => __('Transaction Type', 'sc'),
+                'type' => 'select',
+                'description' => __('Select preferred Transaction Type.', 'sc'),
+                'options' => array(
+                    'a&s' => 'Auth and Settle',
+                    'sale' => 'Sale',
                 )
             ),
             'test' => array(
