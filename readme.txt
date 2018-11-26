@@ -7,7 +7,7 @@ Wordpress requirements:
 WooCommerce requirements: 
 	- minimum v 3.0
 	- tested up to v3.5.1
-Stable tag: 1.6.2
+Stable tag: 1.7
 
 == Description ==
 
@@ -41,6 +41,9 @@ Upload the provided archive and install it. As a final step you should activate 
 Please, contact out Tech-Support team (tech-support@safecharge.com) in case of questions and difficulties. 
 
 == Changelog ==
+
+= 1.8 - 2018-11-26 =
+* New - Add Transaction Type in the backend with two options - Auth and Settle  / Sale, and all logic connected with this option.
 
 = 1.7 - 2018-11-22 =
 * New - Option to cancel the order using Void button.
