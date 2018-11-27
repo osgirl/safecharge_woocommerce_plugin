@@ -81,6 +81,16 @@ else {
     define('SC_TEST_D3D_URL', 'https://ppp-test.safecharge.com/ppp/api/v1/dynamic3D.do');
 }
 
+// payment 3D
+define('SC_LIVE_P3D_URL', 'https://secure.safecharge.com/ppp/api/v1/payment3D.do');
+if(strpos(@$_SERVER['HTTP_HOST'], 'gw-4u.com') !== false || strpos(@$_SERVER['HTTP_HOST'], 'wordpress.mdev') !== false) {
+    define('SC_TEST_P3D_URL', 'https://192.168.103.237/ppp/payment3D.do');
+//    define('SC_TEST_P3D_URL', 'https://apmtest.gate2shop.com/ppp/payment3D.do');
+}
+else {
+    define('SC_TEST_P3D_URL', 'https://ppp-test.safecharge.com/ppp/api/v1/payment3D.do');
+}
+
 // payment with CC (cards) - not used at the moment
 define('SC_LIVE_PAYMENT_CC_URL', 'https://secure.safecharge.com/ppp/api/v1/paymentCC.do');
 if(strpos(@$_SERVER['HTTP_HOST'], 'gw-4u.com') !== false || strpos(@$_SERVER['HTTP_HOST'], 'wordpress.mdev') !== false) {
