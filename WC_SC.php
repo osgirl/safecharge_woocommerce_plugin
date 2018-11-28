@@ -202,7 +202,62 @@ class WC_SC extends WC_Payment_Gateway
                 'label' => __('Create and save daily log files. This can help for debugging and catching bugs.', 'sc'),
                 'default' => 'yes'
             ),
+            'delete_logs' => array(
+                'title' => __('Delete oldest logs.', 'sc'),
+                'type' => 'button',
+                'custom_attributes' => array(
+                    'onclick' => "deleteOldestLogs()",
+                ),
+                'description' => __( 'Only the logs for last 30 days will be keeped.', 'sc' ),
+                'default' => 'Delete Logs.',
+            ),
         );
+    }
+    
+    /**
+     * Function generate_button_html
+     * Generate Button HTML.
+     * Custom function to generate beautiful button in admin settings.
+     * Thanks to https://gist.github.com/BFTrick/31de2d2235b924e853b0
+     *
+     * @access public
+     * @param mixed $key
+     * @param mixed $data
+     * 
+     * @since 1.0.0
+     * 
+     * @return string
+     */
+    public function generate_button_html( $key, $data ) {
+        $field    = $this->plugin_id . $this->id . '_' . $key;
+        $defaults = array(
+            'class'             => 'button-secondary',
+            'css'               => '',
+            'custom_attributes' => array(),
+            'desc_tip'          => false,
+            'description'       => '',
+            'title'             => '',
+        );
+
+        $data = wp_parse_args( $data, $defaults );
+
+        ob_start();
+        ?>
+        <tr valign="top">
+            <th scope="row" class="titledesc">
+                <label for="<?php echo esc_attr( $field ); ?>"><?php echo wp_kses_post( $data['title'] ); ?></label>
+                <?php echo $this->get_tooltip_html( $data ); ?>
+            </th>
+            <td class="forminp">
+                <fieldset>
+                    <legend class="screen-reader-text"><span><?php echo wp_kses_post( $data['title'] ); ?></span></legend>
+                    <button class="<?php echo esc_attr( $data['class'] ); ?>" type="button" name="<?php echo esc_attr( $field ); ?>" id="<?php echo esc_attr( $field ); ?>" style="<?php echo esc_attr( $data['css'] ); ?>" <?php echo $this->get_custom_attribute_html( $data ); ?>><?php echo wp_kses_post( $data['title'] ); ?></button>
+                    <?php echo $this->get_description_html( $data ); ?>
+                </fieldset>
+            </td>
+        </tr>
+        <?php
+        return ob_get_clean();
     }
 
     public function admin_options()
