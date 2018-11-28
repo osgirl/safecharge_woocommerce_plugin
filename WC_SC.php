@@ -208,7 +208,7 @@ class WC_SC extends WC_Payment_Gateway
                 'custom_attributes' => array(
                     'onclick' => "deleteOldestLogs()",
                 ),
-                'description' => __( 'Only the logs for last 30 days will be keeped.', 'sc' ),
+                'description' => __( 'Only the logs for last 30 days will be kept.', 'sc' ),
                 'default' => 'Delete Logs.',
             ),
         );
@@ -248,12 +248,13 @@ class WC_SC extends WC_Payment_Gateway
                 <label for="<?php echo esc_attr( $field ); ?>"><?php echo wp_kses_post( $data['title'] ); ?></label>
                 <?php echo $this->get_tooltip_html( $data ); ?>
             </th>
-            <td class="forminp">
+            <td class="forminp" style="position: relative;">
                 <fieldset>
                     <legend class="screen-reader-text"><span><?php echo wp_kses_post( $data['title'] ); ?></span></legend>
                     <button class="<?php echo esc_attr( $data['class'] ); ?>" type="button" name="<?php echo esc_attr( $field ); ?>" id="<?php echo esc_attr( $field ); ?>" style="<?php echo esc_attr( $data['css'] ); ?>" <?php echo $this->get_custom_attribute_html( $data ); ?>><?php echo wp_kses_post( $data['title'] ); ?></button>
                     <?php echo $this->get_description_html( $data ); ?>
                 </fieldset>
+                <div id="custom_loader" class="blockUI blockOverlay" style="margin-left: -3.5em;"></div>
             </td>
         </tr>
         <?php

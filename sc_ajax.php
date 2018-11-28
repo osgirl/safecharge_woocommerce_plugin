@@ -37,9 +37,43 @@ if(
         SC_REST_API::get_session_token($_SESSION['SC_Variables'], true);
     }
     // when merchant cancel the order via Void button
-    if(isset($_POST['cancelOrder']) && $_POST['cancelOrder'] == 1) {
+    elseif(isset($_POST['cancelOrder']) && $_POST['cancelOrder'] == 1) {
         SC_REST_API::cancel_order($_SESSION['SC_Variables'], true);
         unset($_SESSION['SC_Variables']);
+    }
+    // When user want to delete logs.
+    elseif(isset($_POST['deleteLogs']) && $_POST['deleteLogs'] == 1) {
+        $logs = array();
+        $logs_dir = dirname(__FILE__) . DIRECTORY_SEPARATOR . 'logs' . DIRECTORY_SEPARATOR;
+        
+        foreach(scandir($logs_dir) as $file) {
+            if($file != '.' && $file != '..' && $file != '.htaccess') {
+                $logs[] = $file;
+            }
+        }
+        
+        if(count($logs) > 30) {
+            sort($logs);
+            
+            for($cnt = 0; $cnt < 30; $cnt++) {
+                if(is_file($logs_dir . $logs[$cnt])) {
+                    if(!unlink($logs_dir . $logs[$cnt])) {
+                        echo json_encode(array(
+                            'status' => 0,
+                            'msg' => 'Error when try to delete file: ' . $logs[$cnt]
+                        ));
+                        exit;
+                    }
+                }
+            }
+            
+            echo json_encode(array('status' => 1, 'msg' => ''));
+        }
+        else {
+            echo json_encode(array('status' => 0, 'msg' => 'The log files are less than 30.'));
+        }
+        
+        exit;
     }
     // when we want APMs
     else {

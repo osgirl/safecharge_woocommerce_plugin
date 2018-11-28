@@ -367,7 +367,46 @@ var billing_country_first_val = '';
             });
     }
  }
- 
+
+/**
+ * Function deleteOldestLogs
+ * Delete the oldest logs in Logs directory.
+ */
+function deleteOldestLogs() {
+    if(confirm('Are you sure you wanto to delete log files?')) {
+        jQuery('#custom_loader').show();
+        jQuery('form#mainform #message').remove();
+
+        jQuery.ajax({
+            type: "POST",
+            url: myAjax.ajaxurl,
+            data: {
+                deleteLogs: 1
+                ,callFromJS: 1
+            },
+            dataType: 'json'
+        })
+            .done(function(resp){
+                console.log(resp)
+                
+                if(resp.status == 1) {
+                    jQuery('form#mainform h3').prepend(
+                        '<div id="message" class="updated inline"><p><strong>Success.</strong></p></div>');
+                }
+                else {
+                    jQuery('form#mainform h3').prepend(
+                            '<div id="message" class="error inline"><p><strong>Error: '
+                            + resp.msg +'</strong></p></div>'
+                    );
+                }
+
+                window.location.hash = '#wpbody';
+                window.location = window.location.hash;
+                jQuery('#custom_loader').hide();
+            })
+    }
+}
+
 jQuery(function() {
     billing_country_first_val = jQuery("#billing_country").val();
     
