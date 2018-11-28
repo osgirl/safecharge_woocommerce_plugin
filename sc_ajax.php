@@ -25,8 +25,6 @@ if(
         ,$_POST['callFromJS']
     )
     && $_SERVER['HTTP_X_REQUESTED_WITH'] == 'XMLHttpRequest'
-    // set shis param in JS call to separate JS call from simple class load
-//    && $_POST['callFromJS'] == 1
     // when we cancel order we no need to use rest as value for the payment_api
     && ($_SESSION['SC_Variables']['payment_api'] == 'rest' || isset($_POST['cancelOrder']))
 ) {
@@ -42,7 +40,14 @@ if(
         unset($_SESSION['SC_Variables']);
     }
     // When user want to delete logs.
-    elseif(isset($_POST['deleteLogs']) && $_POST['deleteLogs'] == 1) {
+    elseif(
+        isset($_POST['deleteLogs']) && $_POST['deleteLogs'] == 1
+        && !empty($_SESSION['SC_Variables']['merchantId'])
+        && !empty($_SESSION['SC_Variables']['merchantSiteId'])
+        && !empty($_SESSION['SC_Variables']['payment_api'])
+        && !empty($_SESSION['SC_Variables']['test'])
+        && in_array($_SESSION['SC_Variables']['payment_api'], array('cashier', 'rest'))
+    ) {
         $logs = array();
         $logs_dir = dirname(__FILE__) . DIRECTORY_SEPARATOR . 'logs' . DIRECTORY_SEPARATOR;
         

@@ -81,10 +81,7 @@ var billing_country_first_val = '';
             jQuery.ajax({
                 type: "POST",
                 url: myAjax.ajaxurl,
-                data: {
-                    needST: 1
-                    ,callFromJS: 1
-                },
+                data: { needST: 1 },
                 dataType: 'json'
             })
                 .done(function(resp){
@@ -166,10 +163,7 @@ var billing_country_first_val = '';
         jQuery.ajax({
             type: "POST",
             url: myAjax.ajaxurl,
-            data: {
-                country: jQuery("#billing_country").val()
-                ,callFromJS: 1
-            },
+            data: { country: jQuery("#billing_country").val() },
             dataType: 'json'
         })
             .done(function(resp){
@@ -340,10 +334,7 @@ var billing_country_first_val = '';
         jQuery.ajax({
             type: "POST",
             url: myAjax.ajaxurl,
-            data: {
-                cancelOrder: 1
-                ,callFromJS: 1
-            },
+            data: { cancelOrder: 1 },
             dataType: 'json'
         })
             .done(function(resp) {
@@ -380,10 +371,7 @@ function deleteOldestLogs() {
         jQuery.ajax({
             type: "POST",
             url: myAjax.ajaxurl,
-            data: {
-                deleteLogs: 1
-                ,callFromJS: 1
-            },
+            data: { deleteLogs: 1 },
             dataType: 'json'
         })
             .done(function(resp){
