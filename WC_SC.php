@@ -49,15 +49,18 @@ class WC_SC extends WC_Payment_Gateway
         $this->hash_type        = @$this->settings['hash_type'] ? $this->settings['hash_type'] : 'sha256';
 		$this->payment_api      = @$this->settings['payment_api'] ? $this->settings['payment_api'] : 'cashier';
 		$this->transaction_type = @$this->settings['transaction_type'] ? $this->settings['transaction_type'] : 'a&s';
+		$this->rewrite_dmn      = @$this->settings['rewrite_dmn'] ? $this->settings['rewrite_dmn'] : 'no';
         
         # set session variables for REST API, according REST variables names
         $_SESSION['SC_Variables']['merchantId']         = $this->merchantId;
-        $_SESSION['SC_Variables']['merchantSiteId']    = $this->merchantSiteId;
+        $_SESSION['SC_Variables']['merchantSiteId']     = $this->merchantSiteId;
         $_SESSION['SC_Variables']['currencyCode']       = get_woocommerce_currency();
         $_SESSION['SC_Variables']['languageCode']       = $this->formatLocation(get_locale());
         $_SESSION['SC_Variables']['payment_api']        = $this->payment_api;
+        $_SESSION['SC_Variables']['transactionType']    = $this->transaction_type;
         $_SESSION['SC_Variables']['test']               = $this->test;
         $_SESSION['SC_Variables']['save_logs']          = $this->save_logs;
+        $_SESSION['SC_Variables']['rewrite_dmn']        = $this->rewrite_dmn;
         
         $_SESSION['SC_Variables']['sc_country'] = SC_Versions_Resolver::get_client_country(new WC_Customer);
         if(isset($_POST["billing_country"]) && !empty($_POST["billing_country"])) {
@@ -179,6 +182,12 @@ class WC_SC extends WC_Payment_Gateway
                 'title' => __('Use HTTP', 'sc'),
                 'type' => 'checkbox',
                 'label' => __('Force protocol where receive DMNs to be HTTP. You must have valid certificate for HTTPS! In case the checkbox is not set the default Protocol will be used.', 'sc'),
+                'default' => 'no'
+            ),
+            'rewrite_dmn' => array(
+                'title' => __('Rewrite DMN', 'sc'),
+                'type' => 'checkbox',
+                'label' => __('Check this option ONLY when URL symbols like "+", " " and "%20" in the DMN cause error 404 - Page not found.', 'sc'),
                 'default' => 'no'
             ),
             'show_thanks_msg' => array(
@@ -519,7 +528,12 @@ class WC_SC extends WC_Payment_Gateway
             $this->create_log($payment_method, 'payment method: ');
             
             // ALWAYS CHECK USED PARAMS IN process_payment
-            $resp = SC_REST_API::process_payment($params, $_SESSION['SC_Variables'], $_REQUEST['order-pay'], $payment_method);
+            $resp = SC_REST_API::process_payment(
+                $params
+                ,$_SESSION['SC_Variables']
+                ,$_REQUEST['order-pay']
+                ,$payment_method
+            );
             
             $this->create_log($resp, 'REST API response: ');
             
@@ -540,16 +554,50 @@ class WC_SC extends WC_Payment_Gateway
                 exit;
             }
             
-            if(isset($resp['transactionId'])) {
+            // in case of Payment 3D we get almost same array as sent one
+            if(!isset($resp['status']) && isset($resp['checksum'], $resp['paResponse'])) {
+                // put the response parameters in new session variable
+                $_SESSION['SC_P3D_Params'] = $resp;
+                
+                // now redirect to the acsURL and wait for response DMN
+                $html =
+                    '<form action="'. $resp['acsUrl'] .'" method="post" id="sc_payment_form">'
+                        .'<input type="hidden" name="PaReq" value="'. $resp['paResponse'] .'">'
+                        .'<input type="hidden" name="TermUrl" value="'. $params['pending_url'] .'?wc-api=rest&action=p3d">'
+                        .'<noscript>'
+                            .'<input type="submit" class="button-alt" id="submit_sc_payment_form" value="'.__('Pay via '. SC_GATEWAY_TITLE, 'sc').'" /><a class="button cancel" href="'.$order->get_cancel_order_url().'">'.__('Cancel order &amp; restore cart', 'sc').'</a>'
+                        .'</noscript>'
+                        
+                        .'<script type="text/javascript">'
+                            .'jQuery(function(){'
+                                .'jQuery("#sc_payment_form").submit();'
+                            .'});'
+                        .'</script>'
+                    .'</form>';
+
+                echo $html;
+            }
+            
+            // If we get Transaction ID save it as meta-data
+            if(isset($resp['transactionId']) && $resp['transactionId']) {
                 $order->update_meta_data(SC_GW_TRANS_ID_KEY, $resp['transactionId'], 0);
             }
             
-            if($resp['status'] == 'ERROR') {
+            if(@$resp['status'] == 'ERROR' || @$resp['transactionStatus'] == 'ERROR') {
                 if($order_status == 'pending') {
                     $order->set_status('failed');
                 }
                 
-                $order->add_order_note('Payment error: '.$resp['reason'].'.');
+                $error_txt = 'Payment error';
+                
+                if(@$resp['reason'] != '') {
+                    $error_txt = ': '.$resp['reason'].'.';
+                }
+                elseif(@$resp['transactionStatus'] != '') {
+                    $error_txt = ': '.$resp['transactionStatus'].'.';
+                }
+                
+                $order->add_order_note($error_txt);
                 $order->save();
                 
                 $this->create_log($resp['errCode'].': '.$resp['reason'], 'REST API Payment ERROR: ');
@@ -562,21 +610,15 @@ class WC_SC extends WC_Payment_Gateway
             }
             
             // pay with redirect URL
-            if($resp['status'] == 'SUCCESS') {
+            if(@$resp['status'] == 'SUCCESS') {
+                
+                
+                
+                // in case we have redirectURL
                 if(isset($resp['redirectURL']) && !empty($resp['redirectURL'])) {
                     echo 
                         '<script>'
                             .'var newTab = window.open("'.$resp['redirectURL'].'", "_blank");'
-                            .'newTab.focus();'
-                            .'window.location.href = "'.$params['success_url'].'&status=waiting";'
-                        .'</script>';
-                    
-                    exit;
-                }
-                elseif(isset($resp['acsUrl']) && !empty($resp['acsUrl'])) {
-                    echo 
-                        '<script>'
-                            .'var newTab = window.open("'.$resp['acsUrl'].'", "_blank");'
                             .'newTab.focus();'
                             .'window.location.href = "'.$params['success_url'].'&status=waiting";'
                         .'</script>';
@@ -590,7 +632,6 @@ class WC_SC extends WC_Payment_Gateway
                 $order->set_status('completed');
             }
             
-            // If we get Transaction ID save it as meta-data
             if(@$resp['transactionId']) {
                 $order->add_order_note(__('Payment succsess for Transaction Id ', 'sc') . $resp['transactionId']);
             }

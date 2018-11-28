@@ -16,6 +16,8 @@ if(!defined('ABSPATH')) {
 
 require_once 'sc_config.php';
 
+$wc_sc = null;
+
 add_action('plugins_loaded', 'woocommerce_sc_init', 0);
 
 function woocommerce_sc_init()
@@ -25,15 +27,23 @@ function woocommerce_sc_init()
     }
     
     require_once 'WC_SC.php';
+    
+    global $wc_sc;
+    $wc_sc = new WC_SC();
  
     add_filter('woocommerce_payment_gateways', 'woocommerce_add_sc_gateway' );
 	add_action('init', 'sc_enqueue');
-	add_action('woocommerce_thankyou_order_received_text', 'sc_show_final_text');
-    add_action('woocommerce_create_refund', 'sc_create_refund');
+	add_action('woocommerce_thankyou_order_received_text', 'sc_show_final_text'); // need WC_SC
+    add_action('woocommerce_create_refund', 'sc_create_refund'); // need WC_SC
     // Check checkout for selected apm ONLY when payment api is REST
     add_action( 'woocommerce_checkout_process', 'sc_check_checkout_apm', 20 );
     // add void and/or settle buttons to completed orders
-    add_action( 'woocommerce_order_item_add_action_buttons', 'sc_add_buttons');
+    add_action( 'woocommerce_order_item_add_action_buttons', 'sc_add_buttons'); // need WC_SC
+    
+    // if the merchant needs to rewrite the DMN URL
+    if(isset($wc_sc->settings['rewrite_dmn']) && $wc_sc->settings['rewrite_dmn'] == 'yes') {
+        add_action('template_redirect', 'sc_rewrite_dmn'); // need WC_SC
+    }
 }
 
 /**
@@ -104,10 +114,20 @@ function sc_enqueue($hook)
                         $order->save();
                     }
                     else {
-                        $order -> add_order_note(__('DMN message: Your Void request fail with message: "'
-                            .@$_REQUEST['msg'] .'". Order #'  . $_REQUEST['clientRequestId']
-                            .' was not canceld!', 'sc'));
+                        $msg = 'DMN message: Your Void request fail with message: "';
                         
+                        // in case DMN URL was rewrited all spaces were replaces with "_"
+                        if(@$_REQUEST['wc_sc_redirected'] == 1) {
+                            $msg .= str_replace('_', ' ', @$_REQUEST['msg']);
+                        }
+                        else {
+                            $msg .= @$_REQUEST['msg'];
+                        }
+                        
+                        $msg .= '". Order #'  . $_REQUEST['clientRequestId']
+                            .' was not canceld!';
+                        
+                        $order -> add_order_note(__($msg, 'sc'));
                         $order->save();
                     }
                 }
@@ -151,16 +171,33 @@ function sc_enqueue($hook)
                         @$_REQUEST['transactionStatus'] == 'DECLINED'
                         || @$_REQUEST['transactionStatus'] == 'ERROR'
                     ) {
-                        $order -> add_order_note(__('DMN message: Your try to Refund #'
-                            .$_REQUEST['clientUniqueId'] . ' faild with ERROR: "'
-                            .@$_REQUEST['gwErrorReason'] . '".' , 'sc'));
+                        $msg = 'DMN message: Your try to Refund #' . $_REQUEST['clientUniqueId']
+                            .' faild with ERROR: "';
                         
+                        // in case DMN URL was rewrited all spaces were replaces with "_"
+                        if(@$_REQUEST['wc_sc_redirected'] == 1) {
+                            $msg .= str_replace('_', ' ', @$_REQUEST['gwErrorReason']);
+                        }
+                        else {
+                            $msg .= @$_REQUEST['gwErrorReason'];
+                        }
+                        
+                        $msg .= '".';
+                        
+                        $order -> add_order_note(__($msg, 'sc'));
                         $order->save();
                     }
                 }
                 else {
                     echo 'There is no Order. ';
                 }
+            }
+            // catch the DMN from issuer/bank
+            elseif(@$_REQUEST['action'] == 'p3d') {
+                create_log(@$_REQUEST, 'DMN from issuer/bank: ');
+                
+                // todo redirect to Payment 3D
+                // at the moment because of system bug this case can not be tested
             }
         }
         
@@ -204,6 +241,8 @@ function sc_enqueue($hook)
 function sc_show_final_text()
 {
     global $woocommerce;
+    global $wc_sc;
+    
     $msg = __("Thank you. Your payment process is completed. Your order status will be updated soon.", 'sc');
     
     // REST API
@@ -220,7 +259,6 @@ function sc_show_final_text()
     }
     // Cashier
     elseif(@$_REQUEST['invoice_id'] && @$_REQUEST['ppp_status']) {
-        $g = new WC_SC;
         $arr = explode("_",$_REQUEST['invoice_id']);
         $order_id  = $arr[0];
         $order = new WC_Order($order_id);
@@ -232,9 +270,12 @@ function sc_show_final_text()
             $order -> add_order_note('User order failed.');
             $msg = __("Your payment failed. Please, try again.", 'sc');
         }
-        elseif ($g->checkAdvancedCheckSum()) {
-            $transactionId = "TransactionId = " . (isset($_GET['TransactionID']) ? $_GET['TransactionID'] : "");
-            $pppTransactionId = "; PPPTransactionId = " . (isset($_GET['PPP_TransactionID']) ? $_GET['PPP_TransactionID'] : "");
+        elseif ($wc_sc->checkAdvancedCheckSum()) {
+            $transactionId = "TransactionId = "
+                . (isset($_REQUEST['TransactionID']) ? $_REQUEST['TransactionID'] : "");
+            
+            $pppTransactionId = "; PPPTransactionId = "
+                . (isset($_REQUEST['PPP_TransactionID']) ? $_REQUEST['PPP_TransactionID'] : "");
 
             $order->add_order_note("User returned from Safecharge Payment page; ". $transactionId. $pppTransactionId);
             $woocommerce -> cart -> empty_cart();
@@ -267,9 +308,9 @@ function sc_create_refund()
 {
     // get GW so we can use its settings
     require_once 'WC_SC.php';
-    $gateway = new WC_SC();
+    global $wc_sc;
     
-    $notify_url = $gateway->set_notify_url();
+    $notify_url = $wc_sc->set_notify_url();
     
     // get order refunds
     $order = new WC_Order( (int)$_REQUEST['order_id'] );
@@ -292,7 +333,7 @@ function sc_create_refund()
     
     // execute refund, the response must be array('msg' => 'some msg', 'new_order_status' => 'some status')
     $resp = $sc_api->refund_order(
-        $gateway->settings
+        $wc_sc->settings
         ,$refunds[0]->data
         ,$order_meta_data
         ,get_woocommerce_currency()
@@ -333,7 +374,8 @@ function sc_add_buttons()
         require_once 'SC_REST_API.php';
         require_once 'SC_Versions_Resolver.php';
         
-        $wc_sc = new WC_SC();
+        global $wc_sc;
+        
         $sc_api = new SC_REST_API();
         $sc_v_res = new SC_Versions_Resolver();
         
@@ -388,6 +430,36 @@ function sc_add_buttons()
             '<div id="custom_loader" class="blockUI blockOverlay"></div>';
         
         echo $buttons_html;
+    }
+}
+
+/**
+ * Function sc_rewrite_dmn
+ * When user have problem with white spaces in the URL, it have option to
+ * rewrite the DMN URL and redirect to new one.
+ * 
+ * @global WC_SC $wc_sc
+ */
+function sc_rewrite_dmn()
+{
+    global $wc_sc;
+    $new_url = '';
+    $host = '';
+    
+    if(
+        isset($_REQUEST['ppp_status']) && $_REQUEST['ppp_status'] != ''
+        && (!isset($_REQUEST['wc_sc_redirected']) || $_REQUEST['wc_sc_redirected'] == 0)
+    ) {
+        $host = $wc_sc->get_return_url();
+        
+        if(isset($_SERVER['QUERY_STRING']) && $_SERVER['QUERY_STRING'] != '') {
+            $new_url = preg_replace('/\+|\s|\%20/', '_', $_SERVER['QUERY_STRING']);
+            // put flag the URL was rewrited
+            $new_url .= '&wc_sc_redirected=1';
+            
+            wp_redirect( $host . '?' . $new_url );
+            exit;
+        }
     }
 }
 

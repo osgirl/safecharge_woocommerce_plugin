@@ -42,6 +42,9 @@ Please, contact out Tech-Support team (tech-support@safecharge.com) in case of q
 
 == Changelog ==
 
+= 1.8.1 - 2018-11-28 =
+* New - Option in Admin to rewrite DMN URL and redirect to new one. This helps when the user have 404 page problem with "+", " " and "%20" symbols in the URL.
+
 = 1.8 - 2018-11-26 =
 * New - Add Transaction Type in the backend with two options - Auth and Settle  / Sale, and all logic connected with this option.
 
