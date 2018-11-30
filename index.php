@@ -3,7 +3,7 @@
 Plugin Name: SafeCharge WooCommerce PlugIn
 Plugin URI: http://www.safecharge.com
 Description: SafeCharge gateway for woocommerce
-Version: 1.5
+Version: 1.8.1
 Author: SafeCharge
 Author URI:http://safecharge.com
 */
@@ -32,7 +32,7 @@ function woocommerce_sc_init()
     $wc_sc = new WC_SC();
  
     add_filter('woocommerce_payment_gateways', 'woocommerce_add_sc_gateway' );
-	add_action('init', 'sc_enqueue');
+	add_action('init', 'sc_enqueue'); // need WC_SC
 	add_action('woocommerce_thankyou_order_received_text', 'sc_show_final_text'); // need WC_SC
     add_action('woocommerce_create_refund', 'sc_create_refund'); // need WC_SC
     // Check checkout for selected apm ONLY when payment api is REST
@@ -41,9 +41,9 @@ function woocommerce_sc_init()
     add_action( 'woocommerce_order_item_add_action_buttons', 'sc_add_buttons'); // need WC_SC
     
     // if the merchant needs to rewrite the DMN URL
-    if(isset($wc_sc->settings['rewrite_dmn']) && $wc_sc->settings['rewrite_dmn'] == 'yes') {
-        add_action('template_redirect', 'sc_rewrite_dmn'); // need WC_SC
-    }
+//    if(isset($wc_sc->settings['rewrite_dmn']) && $wc_sc->settings['rewrite_dmn'] == 'yes') {
+//        add_action('template_redirect', 'sc_rewrite_dmn'); // need WC_SC
+//    }
     
     register_setting("mw_options", "mw_options_wc_order_attachement_1", "mw_options_wc_order_attachement_1_handle");
     add_action('admin_menu', 'test_button_menu');
@@ -129,154 +129,12 @@ function woocommerce_add_sc_gateway($methods)
 // first method we come in
 function sc_enqueue($hook)
 {
+    global $wc_sc;
+    
     # DMNs catch
     if(isset($_REQUEST['wc-api']) && !empty($_REQUEST['wc-api'])) {
-        create_log($_REQUEST, 'DMN receive with params: ');
-        
-        /* Cashier DMN
-         * Skip order status update if currentlly received status is 'pending' and curent order status is 'completed'.
-         * For the rest of the cases the status should be updated. 
-        */
-        if(
-            strtolower($_REQUEST['wc-api']) == 'wc_gateway_sc'
-            && isset($_REQUEST['Status'], $_REQUEST['invoice_id'])
-            && !empty($_REQUEST['Status'])
-            && !empty($_REQUEST['invoice_id'])
-        ) {
-            create_log($_REQUEST['invoice_id'], 'sc_enqueue() Cashier DMN invoice_id: ');
-            
-            $arr = explode("_", $_REQUEST['invoice_id']);
-
-            if(is_array($arr) && $arr) {
-                $order_id  = $arr[0];
-                $order = new WC_Order($order_id);
-
-                if($order_id && $order && strtolower($_REQUEST['Status']) == 'pending') {
-                    $order_status = strtolower($order->get_status());
-
-                    if ($order_status != 'completed') {
-                        $order->set_status($_REQUEST['Status']);
-                    }
-                }
-            }
-        }
-        // REST API DMN
-        elseif(strtolower($_REQUEST['wc-api']) == 'rest') {
-            // catch Void 
-            if(
-                @$_REQUEST['action'] == 'void'
-                && !empty(@$_REQUEST['clientRequestId'])
-                && (@$_REQUEST['Status'] == 1 || @$_REQUEST['Status'] == 0)
-            ) {
-                $order = new WC_Order($_REQUEST['clientRequestId']);
-                if($order) {
-                    $order_status = strtolower($order->get_status());
-
-                    // change order status to canceld
-                    if(
-                        $_REQUEST['Status'] == 1
-                        && $order_status != 'canceled'
-                        && $order_status != 'cancelled'
-                    ) {
-                        $order->add_order_note(__('DMN message: Your Void request was succesw, Order #'
-                            .$_REQUEST['clientRequestId'] . ' was canceld.', 'sc'));
-                        
-                        $order->update_status('cancelled');
-                        $order->save();
-                    }
-                    else {
-                        $msg = 'DMN message: Your Void request fail with message: "';
-                        
-                        // in case DMN URL was rewrited all spaces were replaces with "_"
-                        if(@$_REQUEST['wc_sc_redirected'] == 1) {
-                            $msg .= str_replace('_', ' ', @$_REQUEST['msg']);
-                        }
-                        else {
-                            $msg .= @$_REQUEST['msg'];
-                        }
-                        
-                        $msg .= '". Order #'  . $_REQUEST['clientRequestId']
-                            .' was not canceld!';
-                        
-                        $order -> add_order_note(__($msg, 'sc'));
-                        $order->save();
-                    }
-                }
-                else {
-                    echo 'There is no Order. ';
-                }
-            }
-            // catch for Refund in case the API fail,
-            // see https://www.safecharge.com/docs/API/?json#refundTransaction -> Output Parameters
-            elseif(
-                @$_REQUEST['action'] == 'refund'
-                && !empty(@$_REQUEST['Status'])
-                && !empty(@$_REQUEST['clientUniqueId'])
-                && !empty(@$_REQUEST['order_id'])
-            ) {
-                $order = new WC_Order($_REQUEST['order_id']);
-                
-                if($order) {
-                    $order_status = strtolower($order->get_status());
-
-                    // change to Refund if request is Approved and the Order status is not Refunded
-                    if(
-                        $order_status !== 'refunded'
-                        && $_REQUEST['Status'] == 'SUCCESS'
-                        && @$_REQUEST['transactionStatus'] == 'APPROVED'
-                    ) {
-                        $order->update_status('refunded');
-                        $order -> add_order_note(__('DMN message: Your request - Refund #' .
-                            $_REQUEST['clientUniqueId'] . ', was successful.', 'sc'));
-                        
-                        $order->save();
-                    }
-                    elseif($_REQUEST['Status'] == 'ERROR') {
-                        $order -> add_order_note(__('DMN message: Your try to Refund #'
-                            .$_REQUEST['clientUniqueId'] . ' faild with ERROR: "'
-                            . @$_REQUEST['Reason'] . '".' , 'sc'));
-                        
-                        $order->save();
-                    }
-                    elseif(
-                        @$_REQUEST['transactionStatus'] == 'DECLINED'
-                        || @$_REQUEST['transactionStatus'] == 'ERROR'
-                    ) {
-                        $msg = 'DMN message: Your try to Refund #' . $_REQUEST['clientUniqueId']
-                            .' faild with ERROR: "';
-                        
-                        // in case DMN URL was rewrited all spaces were replaces with "_"
-                        if(@$_REQUEST['wc_sc_redirected'] == 1) {
-                            $msg .= str_replace('_', ' ', @$_REQUEST['gwErrorReason']);
-                        }
-                        else {
-                            $msg .= @$_REQUEST['gwErrorReason'];
-                        }
-                        
-                        $msg .= '".';
-                        
-                        $order -> add_order_note(__($msg, 'sc'));
-                        $order->save();
-                    }
-                }
-                else {
-                    echo 'There is no Order. ';
-                }
-            }
-            // catch the DMN from issuer/bank
-            elseif(@$_REQUEST['action'] == 'p3d') {
-                create_log(@$_REQUEST, 'DMN from issuer/bank: ');
-                
-                // todo redirect to Payment 3D
-                // at the moment because of system bug this case can not be tested
-            }
-        }
-        
-        // stop script here or we will get code 400
-        echo 'DMN received.';
-        exit;
+        $wc_sc->process_dmns();
     }
-    # DMNs catch END
     
     # load external files
     $plugin_dir = basename(dirname(__FILE__));
@@ -315,58 +173,47 @@ function sc_show_final_text()
     global $wc_sc;
     
     $msg = __("Thank you. Your payment process is completed. Your order status will be updated soon.", 'sc');
-    
-    // REST API
-    if(isset($_REQUEST['wc-api']) && strtolower($_REQUEST['wc-api']) == 'wc_sc_rest') {
-        if ( strtolower($_REQUEST['status']) == 'failed' ) {
-            $msg = __("Your payment failed. Please, try again.", 'sc');
+   
+    // Cashier
+    if(@$_REQUEST['invoice_id'] && @$_REQUEST['ppp_status'] && $wc_sc->checkAdvancedCheckSum()) {
+        try {
+            $arr = explode("_",$_REQUEST['invoice_id']);
+            $order_id  = $arr[0];
+            $order = new WC_Order($order_id);
+
+            if (strtolower($_REQUEST['ppp_status']) == 'fail') {
+                $order->add_order_note('User order failed.');
+                $order->update_status('failed', 'User order failed.');
+
+                $msg = __("Your payment failed. Please, try again.", 'sc');
+            }
+            else{
+                $transactionId = "TransactionId = "
+                    . (isset($_REQUEST['TransactionID']) ? $_REQUEST['TransactionID'] : "");
+
+                $pppTransactionId = "; PPPTransactionId = "
+                    . (isset($_REQUEST['PPP_TransactionID']) ? $_REQUEST['PPP_TransactionID'] : "");
+
+                $order->add_order_note("User returned from Safecharge Payment page; ". $transactionId. $pppTransactionId);
+                $woocommerce -> cart -> empty_cart();
+            }
+            
+            $order->save();
         }
-        elseif(strtolower($_REQUEST['status']) == 'success') {
-            $woocommerce -> cart -> empty_cart();
+        catch (Exception $ex) {
+            create_log($ex->getMessage(), 'Cashier handle exception error: ');
+        }
+        
+    }
+    // REST API tahnk you page handler
+    else{
+        if ( strtolower($_REQUEST['Status']) == 'fail' ) {
+            $msg = __("Your payment failed. Please, try again.", 'sc');
         }
         else {
             $woocommerce -> cart -> empty_cart();
         }
     }
-    // Cashier
-    elseif(@$_REQUEST['invoice_id'] && @$_REQUEST['ppp_status']) {
-        $arr = explode("_",$_REQUEST['invoice_id']);
-        $order_id  = $arr[0];
-        $order = new WC_Order($order_id);
-        
-        if (
-            strtolower($_REQUEST['ppp_status']) == 'failed'
-            || strtolower($_REQUEST['ppp_status']) == 'fail'
-        ) {
-            $order -> add_order_note('User order failed.');
-            $msg = __("Your payment failed. Please, try again.", 'sc');
-        }
-        elseif ($wc_sc->checkAdvancedCheckSum()) {
-            $transactionId = "TransactionId = "
-                . (isset($_REQUEST['TransactionID']) ? $_REQUEST['TransactionID'] : "");
-            
-            $pppTransactionId = "; PPPTransactionId = "
-                . (isset($_REQUEST['PPP_TransactionID']) ? $_REQUEST['PPP_TransactionID'] : "");
-
-            $order->add_order_note("User returned from Safecharge Payment page; ". $transactionId. $pppTransactionId);
-            $woocommerce -> cart -> empty_cart();
-        }
-        
-        $order->save();
-    }
-    else {
-        $woocommerce -> cart -> empty_cart();
-        
-        if ( strtolower(@$_REQUEST['status']) == 'failed' ) {
-            $msg = __("Your payment failed. Please, try again.", 'sc');
-        }
-    }
-    
-    if(strtolower(@$_REQUEST['status']) == 'waiting') {
-        $msg = __("Thank you. If you completed your payment, the order status will be updated soon", 'sc');
-        $woocommerce -> cart -> empty_cart();
-    }
-    
     // clear session variables for the order
     if(isset($_SESSION['SC_Variables'])) {
         unset($_SESSION['SC_Variables']);

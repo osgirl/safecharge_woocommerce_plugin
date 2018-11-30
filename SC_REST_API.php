@@ -80,7 +80,7 @@ class SC_REST_API
         }
         catch(Exception $e) {
             return array(
-                'msg' => 'Exception ERROR - "' . print_r($e) .'".',
+                'msg' => 'Exception ERROR - "' . print_r($e->getMessage()) .'".',
                 'new_order_status' => ''
             );
         }
@@ -193,8 +193,8 @@ class SC_REST_API
             
             
         }
-        catch (Exception $ex) {
-            self::create_log($e, 'Exception ERROR when call REST API: ');
+        catch (Exception $e) {
+            self::create_log($e->getMessage(), 'Exception ERROR when call REST API: ');
             
             self::return_response(
                 array(
@@ -311,7 +311,7 @@ class SC_REST_API
             self::create_log($resp, 'Call rest api response: ');
         }
         catch(Exception $e) {
-            self::create_log($e, 'Exception ERROR when call REST API: ');
+            self::create_log($e->getMessage(), 'Exception ERROR when call REST API: ');
             return false;
         }
         
@@ -389,11 +389,11 @@ class SC_REST_API
         }
         catch(Exception $e) {
             if($is_ajax) {
-                echo json_encode(array('status' => 0, 'data' => print_r($e)));
+                echo json_encode(array('status' => 0, 'data' => print_r($e->getMessage())));
                 exit;
             }
 
-            return json_encode(array('status' => 0, 'data' => print_r($e)));
+            return json_encode(array('status' => 0, 'data' => print_r($e->getMessage())));
         }
         
         if($is_ajax) {
@@ -540,85 +540,13 @@ class SC_REST_API
             self::create_log($resp, 'REST API Response when Process Payment: ');
         }
         catch(Exception $e) {
-            self::create_log($e, 'Process Payment Exception ERROR: ');
+            self::create_log($e->getMessage(), 'Process Payment Exception ERROR: ');
             return false;
         }
         
         if(!$resp || !is_array($resp)) {
             self::create_log($resp, 'Process Payment response: ');
             return false;
-        }
-        
-        // TODO those checks must be in WC_SC !!!
-        // for D3D we have 3 cases after get the response
-        if($payment_method == 'd3d' && $params['isDynamic3D'] == 1) {
-            // case 1
-            if(
-                isset($resp['acsUrl']) && !empty($resp['acsUrl'])
-                && isset($resp['threeDFlow']) && intval($resp['threeDFlow']) == 1
-            ) {
-                // special parameters for D3D and P3D
-                $params['transactionType']  = $sc_variables['transactionType'];
-                $params['paResponse']       = @$resp['paRequest'];
-                $params['urlDetails']       = array('notificationUrl' => $data['urlDetails']);
-                $params['p3d_url']          = $sc_variables['test'] == 'yes' ? SC_TEST_P3D_URL : SC_LIVE_P3D_URL;
-                
-                // return all to the caller method
-                return $params;
-                
-                /*
-                // step 1
-                
-                // step 2 call payment3D - use $params
-                try {
-                    $p3d_resp = self::call_rest_api(
-                        $sc_variables['test'] == 'yes' ? SC_TEST_P3D_URL : SC_LIVE_P3D_URL
-                        ,$params
-                        ,$data['checksum']
-                    );
-                    
-                    self::create_log($p3d_resp, 'Process Payment Payment p3d_resp: ');
-                }
-                catch(Exception $e) {
-                    self::create_log($e, 'Process Payment Payment 3D Exception ERROR: ');
-                    return false;
-                }
-                
-                if(!$resp || !is_array($resp)) {
-                    self::create_log($resp, 'Process Payment response: ');
-                    return false;
-                }
-                
-                return $p3d_resp;
-                 */
-            }
-            // case 2 and 3
-            else {
-                // case 2 - call payment3D
-                if(isset($resp['threeDFlow']) && intval($resp['threeDFlow']) == 1) {
-                    try {
-                        $p3d_resp = self::call_rest_api(
-                            $sc_variables['test'] == 'yes' ? SC_TEST_P3D_URL : SC_LIVE_P3D_URL
-                            ,$params
-                            ,$data['checksum']
-                        );
-
-                        self::create_log($p3d_resp, 'Process Payment Payment p3d_resp: ');
-                    }
-                    catch(Exception $e) {
-                        self::create_log($e, 'Process Payment Payment 3D Exception ERROR: ');
-                        return false;
-                    }
-
-                    if(!$resp || !is_array($resp)) {
-                        self::create_log($resp, 'Process Payment response: ');
-                        return false;
-                    }
-
-                    return $p3d_resp;
-                }
-                // case 3 anyway return response
-            }
         }
         
         return $resp;
@@ -665,7 +593,7 @@ class SC_REST_API
             );
         }
         catch(Exception $e) {
-            self::create_log($e, 'Getting SessionToken Exception ERROR: ');
+            self::create_log($e->getMessage(), 'Getting SessionToken Exception ERROR: ');
             
             if($is_ajax) {
                 echo json_encode(array('status' => 0));
@@ -853,7 +781,7 @@ class SC_REST_API
             catch (Exception $exc) {
                 echo
                     '<script>'
-                        .'error.log("Log file was not created, by reason: '.$exc.'");'
+                        .'error.log("Log file was not created, by reason: '.$exc->getMessage().'");'
                         .'console.log("Log file was not created, by reason: '.$data.'");'
                     .'</script>';
             }

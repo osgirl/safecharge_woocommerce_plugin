@@ -22,7 +22,6 @@ if(
         ,$_SESSION['SC_Variables']['merchantSiteId']
         ,$_SESSION['SC_Variables']['payment_api']
         ,$_SESSION['SC_Variables']['test']
-        ,$_POST['callFromJS']
     )
     && $_SERVER['HTTP_X_REQUESTED_WITH'] == 'XMLHttpRequest'
     // when we cancel order we no need to use rest as value for the payment_api

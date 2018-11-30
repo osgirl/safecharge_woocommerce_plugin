@@ -345,7 +345,7 @@ var billing_country_first_val = '';
                 ) {
                     // call DMN page:
                     jQuery.ajax({
-                        url: '//' + window.location.host +'/?wc-api=Rest&action=void&Status='
+                        url: '//' + window.location.host +'/?wc-api=WC_SC_Rest&action=void&Status='
                             +resp.status +'&clientRequestId='+ orderId +'&msg='+ resp.msg,
                         dataType: 'text'
                     })
@@ -375,8 +375,6 @@ function deleteOldestLogs() {
             dataType: 'json'
         })
             .done(function(resp){
-                console.log(resp)
-                
                 if(resp.status == 1) {
                     jQuery('form#mainform h3').prepend(
                         '<div id="message" class="updated inline"><p><strong>Success.</strong></p></div>');
