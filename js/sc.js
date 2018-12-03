@@ -118,11 +118,19 @@ var billing_country_first_val = '';
     if(resp.status == 'ERROR') {
         jQuery('#custom_loader').hide();
         
+        var msg = 'Error when try to proceed the payment. Please, check you fields!';
+        if(typeof resp.reason != 'undefined' && resp.reason != '') {
+            msg = resp.reason;
+        }
+                 
         jQuery('form.woocommerce-checkout').prepend(
             '<ul class="woocommerce-error" role="alert">'
-                +'<li><strong>Error when try to proceed the payment. Please, try again later!</strong></li>'
+                +'<li><strong>'+msg+'</strong></li>'
             +'</ul>'
         );
+
+        window.location.hash = '#main';
+        window.location = window.location.hash;
     }
     else if(resp.status == 'SUCCESS') {
         jQuery('#' + selectedPM + '_' + tokAPMsFields.cardNumber).val(resp.ccTempToken);

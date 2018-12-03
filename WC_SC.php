@@ -48,7 +48,7 @@ class WC_SC extends WC_Payment_Gateway
         $this->save_logs        = @$this->settings['save_logs'] ? $this->settings['save_logs'] : 'yes';
         $this->hash_type        = @$this->settings['hash_type'] ? $this->settings['hash_type'] : 'sha256';
 		$this->payment_api      = @$this->settings['payment_api'] ? $this->settings['payment_api'] : 'cashier';
-		$this->transaction_type = @$this->settings['transaction_type'] ? $this->settings['transaction_type'] : 'a&s';
+		$this->transaction_type = @$this->settings['transaction_type'] ? $this->settings['transaction_type'] : 'sale';
 		$this->rewrite_dmn      = @$this->settings['rewrite_dmn'] ? $this->settings['rewrite_dmn'] : 'no';
         
         # set session variables for REST API, according REST variables names
@@ -163,15 +163,15 @@ class WC_SC extends WC_Payment_Gateway
                     'rest' => 'REST API',
                 )
             ),
-            'transaction_type' => array(
-                'title' => __('Transaction Type', 'sc'),
-                'type' => 'select',
-                'description' => __('Select preferred Transaction Type.', 'sc'),
-                'options' => array(
-                    'a&s' => 'Auth and Settle',
-                    'sale' => 'Sale',
-                )
-            ),
+//            'transaction_type' => array(
+//                'title' => __('Transaction Type', 'sc'),
+//                'type' => 'select',
+//                'description' => __('Select preferred Transaction Type.', 'sc'),
+//                'options' => array(
+//                    'a&s' => 'Auth and Settle',
+//                    'sale' => 'Sale',
+//                )
+//            ),
             'test' => array(
                 'title' => __('Test mode', 'sc'),
                 'type' => 'checkbox',
@@ -184,12 +184,12 @@ class WC_SC extends WC_Payment_Gateway
                 'label' => __('Force protocol where receive DMNs to be HTTP. You must have valid certificate for HTTPS! In case the checkbox is not set the default Protocol will be used.', 'sc'),
                 'default' => 'no'
             ),
-            'rewrite_dmn' => array(
-                'title' => __('Rewrite DMN', 'sc'),
-                'type' => 'checkbox',
-                'label' => __('Check this option ONLY when URL symbols like "+", " " and "%20" in the DMN cause error 404 - Page not found.', 'sc'),
-                'default' => 'no'
-            ),
+//            'rewrite_dmn' => array(
+//                'title' => __('Rewrite DMN', 'sc'),
+//                'type' => 'checkbox',
+//                'label' => __('Check this option ONLY when URL symbols like "+", " " and "%20" in the DMN cause error 404 - Page not found.', 'sc'),
+//                'default' => 'no'
+//            ),
             'show_thanks_msg' => array(
                 'title' => __('Show "Loading message"', 'sc'),
                 'type' => 'checkbox',
@@ -583,7 +583,6 @@ class WC_SC extends WC_Payment_Gateway
             
             $this->create_log($params, 'params sent to REST: ');
             $this->create_log($_SESSION['SC_Variables'], 'SC_Variables: ');
-            $this->create_log($payment_method, 'payment method: ');
             
             // ALWAYS CHECK USED PARAMS IN process_payment
             $resp = SC_REST_API::process_payment(
@@ -653,7 +652,15 @@ class WC_SC extends WC_Payment_Gateway
                 // isDynamic3D is hardcoded to be 1, see SC_REST_API line 509
                 // for the three cases see: https://www.safecharge.com/docs/API/?json#dynamic3D,
                 // Possible Scenarios for Dynamic 3D (isDynamic3D = 1)
+                
+                unset($_SESSION['SC_P3D_Params']);
+                
+//                echo '<pre>'.print_r($params,true).'</pre>';
+//                echo '<pre>'.print_r($resp,true).'</pre>';
+//                echo '<pre>'.print_r($_SESSION,true).'</pre>';
+                
                 if($payment_method == 'd3d') {
+                    /*
                     $params['transactionType']  = $_SESSION['SC_Variables']['transactionType'];
                     $params['orderId']          = $resp['orderId'];
                     $params['paResponse']       = '';
@@ -661,21 +668,65 @@ class WC_SC extends WC_Payment_Gateway
                     $params['sessionToken']     = $resp['sessionToken'];
                     $params['p3d_url']          = $_SESSION['SC_Variables']['test'] == 'yes'
                         ? SC_TEST_P3D_URL : SC_LIVE_P3D_URL;
+                     */
                     
                     $params_p3d = array(
-                        'sessionToken' => $resp['sessionToken'],
-                        'orderId' => $resp['orderId'],
-                        'merchantId' => $params['merchant_id'],
-                        'merchantSiteId' => $params['merchant_site_id'],
-                        'userTokenId' => $params['userTokenId'],
+                        'sessionToken'      => $resp['sessionToken'],
+                        'orderId'           => $resp['orderId'],
+                        'merchantId'        => $resp['merchantId'],
+                        'merchantSiteId'    => $resp['merchantSiteId'],
+                        'userTokenId'       => $resp['userTokenId'],
+                        'clientUniqueId'    => $resp['clientUniqueId'],
+                        'clientRequestId'   => $resp['clientRequestId'],
+                        'transactionType'   => $resp['clientRequestId'],
+                        'currency'          => $params['currency'],
+                        'amount'            => $params['total_amount'],
+                        'amountDetails'     => array(
+                            'totalShipping'     => '',
+                            'totalHandling'     => $params['handling'],
+                            'totalDiscount'     => $params['discount'],
+                            'totalTax'          => $params['total_tax'],
+                        ),
+                        'items'             => $params['items'],
+                        'deviceDetails'     => array(), // get them in SC_REST_API Class
+                        'shippingAddress'   => array(
+                            'firstName'         => $params['shippingFirstName'],
+                            'lastName'          => $params['shippingLastName'],
+                            'address'           => $params['shippingAddress'],
+                            'phone'             => '',
+                            'zip'               => $params['shippingZip'],
+                            'city'              => $params['shippingCity'],
+                            'country'           => $params['shippingCountry'],
+                            'state'             => '',
+                            'email'             => '',
+                            'shippingCounty'    => '',
+                        ),
+                        'billingAddress'    => array(
+                            'firstName'         => $params['first_name'],
+                            'lastName'          => $params['last_name'],
+                            'address'           => $params['address1'],
+                            'phone'             => $params['phone1'],
+                            'zip'               => $params['zip'],
+                            'city'              => $params['city'],
+                            'country'           => $params['country'],
+                            'state'             => '',
+                            'email'             => $params['email'],
+                            'county'            => '',
+                        ),
+                        'cardData'          => array(
+                            'ccTempToken'       => $_SESSION['SC_Variables']['APM_data']['apm_fields']['ccCardNumber'],
+                            'CVV'               => $_SESSION['SC_Variables']['APM_data']['apm_fields']['CVV'],
+                            'cardHolderName'    => $_SESSION['SC_Variables']['APM_data']['apm_fields']['ccNameOnCard'],
+                        ),
+                        'paResponse'        => '',
+                        'urlDetails'        => array('notificationUrl' => $params['urlDetails']),
+                        'timeStamp'         => $params['time_stamp'],
+                        'checksum'          => $params['checksum'],
                     );
                     
+                //    die('die');
                     
-                    
-                    
-                    
-                    
-                    $_SESSION['SC_P3D_Params'] = $params;
+                    $_SESSION['SC_P3D_Params'] = $params_p3d;
                     
                     // case 1
                     if(
@@ -786,7 +837,7 @@ class WC_SC extends WC_Payment_Gateway
         require_once 'SC_REST_API.php';
         
         $p3d_resp = SC_REST_API::call_rest_api(
-            @$_SESSION['SC_P3D_Params']['p3d_url']
+            @$_SESSION['SC_Variables']['test'] == 'yes' ? SC_TEST_P3D_URL : SC_LIVE_P3D_URL
             ,@$_SESSION['SC_P3D_Params']
             ,$_SESSION['SC_P3D_Params']['checksum']
         );

@@ -284,6 +284,11 @@ class SC_REST_API
             $params = $checksum_params;
         }
         
+        // get them only if we pass them empty
+        if(isset($params['deviceDetails']) && empty($params['deviceDetails'])) {
+            $params['deviceDetails'] = self::get_device_details();
+        }
+        
         $json_post = json_encode($params);
         self::create_log($json_post, 'params as json: ');
         
