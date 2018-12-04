@@ -1173,14 +1173,14 @@ class WC_SC extends WC_Payment_Gateway
         exit;
     }
     
-    public function process_admin_options()
-    {
-        $this->create_log('', 'call function process_admin_options()');
-        add_action(
-            'woocommerce_update_options_payment_gateways',
-            array( $this, 'process_admin_options' )
-        );
-    }
+//    public function process_admin_options()
+//    {
+//        $this->create_log('', 'call function process_admin_options()');
+//        add_action(
+//            'woocommerce_update_options_payment_gateways',
+//            array( $this, 'process_admin_options' )
+//        );
+//    }
 
     public function sc_checkout_process()
     {
@@ -1437,7 +1437,7 @@ class WC_SC extends WC_Payment_Gateway
 	 * @return boolean True or false based on success, or a WP_Error object.
      */
     public function process_refund( $order_id, $amount = null, $reason = '' ) {
-        return false;
+        return true;
 	}
     
     /**
@@ -1452,7 +1452,7 @@ class WC_SC extends WC_Payment_Gateway
     private function sc_refund_order($order_id, $refund_reason = '')
     {
         if(!$this->checkAdvancedCheckSum()) {
-        //    return new WP_Error( 'error', __( 'The checkAdvancedCheckSum did not mutch!', 'sc' ) );
+            return new WP_Error( 'error', __( 'The checkAdvancedCheckSum did not mutch!', 'sc' ) );
         }
         
         $order  = wc_get_order( $order_id );

@@ -1,13 +1,10 @@
 <?php
-
 /* 
- * A try to get what we need when work with different versions of WooCommers.
- * The minimum version for support is v 3.0.0
+ * A try to get what we need when work with different versions of WooCommers
  * 
  * SafeCharge
  * 2018-08
  */
-
 class SC_Versions_Resolver
 {
     /**
@@ -19,7 +16,7 @@ class SC_Versions_Resolver
     public static function process_admin_options($_this)
     {
         add_action(
-            'woocommerce_update_options_payment_gateways',
+            'woocommerce_update_options_payment_gateways_' . $_this->id,
             array( &$_this, 'process_admin_options' )
         );
     }
@@ -160,11 +157,21 @@ class SC_Versions_Resolver
      */
     public static function get_client_country($client)
     {
-        return $client->get_billing_country();
+        if ( version_compare( WOOCOMMERCE_VERSION, '3.0.0', '>' ) ) {
+            return $client->get_billing_country();
+        }
+        else {
+            return $client->get_country();
+        }
     }
     
     public static function get_shipping($order)
     {
-        return $order->get_shipping_total();
+        if ( version_compare( WOOCOMMERCE_VERSION, '3.0.0', '>' ) ) {
+            return $order->get_shipping_total();
+        }
+        else {
+            return $order->get_total_shipping();
+        }
     }
 }
