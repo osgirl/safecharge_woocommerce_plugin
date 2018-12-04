@@ -37,6 +37,8 @@ class WC_SC extends WC_Payment_Gateway
 		$this->init_form_fields();
 		$this->init_settings();
         
+        //var_dump($this->settings);die;
+        
 		$this->title            = @$this->settings['title'] ? $this->settings['title'] : '';
 		$this->description      = @$this->settings['description'] ? $this->settings['description'] : '';
 		$this->merchantId       = @$this->settings['merchantId'] ? $this->settings['merchantId'] : '';
@@ -50,6 +52,8 @@ class WC_SC extends WC_Payment_Gateway
 		$this->payment_api      = @$this->settings['payment_api'] ? $this->settings['payment_api'] : 'cashier';
 		$this->transaction_type = @$this->settings['transaction_type'] ? $this->settings['transaction_type'] : 'sale';
 		$this->rewrite_dmn      = @$this->settings['rewrite_dmn'] ? $this->settings['rewrite_dmn'] : 'no';
+        // to enable auto refund support
+        $this->supports         = array('products', 'refunds');
         
         # set session variables for REST API, according REST variables names
         $_SESSION['SC_Variables']['merchantId']         = $this->merchantId;
@@ -62,7 +66,9 @@ class WC_SC extends WC_Payment_Gateway
         $_SESSION['SC_Variables']['save_logs']          = $this->save_logs;
         $_SESSION['SC_Variables']['rewrite_dmn']        = $this->rewrite_dmn;
         
+        $client = new WC_Customer();
         $_SESSION['SC_Variables']['sc_country'] = SC_Versions_Resolver::get_client_country(new WC_Customer);
+    //    $_SESSION['SC_Variables']['sc_country'] = $client->get_billing_country();
         if(isset($_POST["billing_country"]) && !empty($_POST["billing_country"])) {
             $_SESSION['SC_Variables']['sc_country'] = $_POST["billing_country"];
         }
@@ -98,6 +104,8 @@ class WC_SC extends WC_Payment_Gateway
 		$this->msg['class'] = "";
 
         SC_Versions_Resolver::process_admin_options($this);
+    //    add_action('woocommerce_update_options_payment_gateways', array( $this, 'process_admin_options' ));
+        
 		add_action('woocommerce_checkout_process', array($this, 'sc_checkout_process'));
 		add_action('woocommerce_receipt_'.$this->id, array($this, 'receipt_page'));
 		add_action('woocommerce_api_wc_gateway_sc', array($this, 'process_sc_notification'));
@@ -163,15 +171,15 @@ class WC_SC extends WC_Payment_Gateway
                     'rest' => 'REST API',
                 )
             ),
-//            'transaction_type' => array(
-//                'title' => __('Transaction Type', 'sc'),
-//                'type' => 'select',
-//                'description' => __('Select preferred Transaction Type.', 'sc'),
-//                'options' => array(
-//                    'a&s' => 'Auth and Settle',
-//                    'sale' => 'Sale',
-//                )
-//            ),
+            'transaction_type' => array(
+                'title' => __('Transaction Type', 'sc'),
+                'type' => 'select',
+                'description' => __('Select preferred Transaction Type.', 'sc'),
+                'options' => array(
+                    'a&s' => 'Auth and Settle',
+                    'sale' => 'Sale',
+                )
+            ),
             'test' => array(
                 'title' => __('Test mode', 'sc'),
                 'type' => 'checkbox',
@@ -184,12 +192,12 @@ class WC_SC extends WC_Payment_Gateway
                 'label' => __('Force protocol where receive DMNs to be HTTP. You must have valid certificate for HTTPS! In case the checkbox is not set the default Protocol will be used.', 'sc'),
                 'default' => 'no'
             ),
-//            'rewrite_dmn' => array(
-//                'title' => __('Rewrite DMN', 'sc'),
-//                'type' => 'checkbox',
-//                'label' => __('Check this option ONLY when URL symbols like "+", " " and "%20" in the DMN cause error 404 - Page not found.', 'sc'),
-//                'default' => 'no'
-//            ),
+            'rewrite_dmn' => array(
+                'title' => __('Rewrite DMN', 'sc'),
+                'type' => 'checkbox',
+                'label' => __('Check this option ONLY when URL symbols like "+", " " and "%20" in the DMN cause error 404 - Page not found.', 'sc'),
+                'default' => 'no'
+            ),
             'show_thanks_msg' => array(
                 'title' => __('Show "Loading message"', 'sc'),
                 'type' => 'checkbox',
@@ -373,6 +381,7 @@ class WC_SC extends WC_Payment_Gateway
         $params['numberofitems'] = $i-1;
         
         $params['handling'] = SC_Versions_Resolver::get_shipping($order);
+    //    $params['handling'] = $order->get_shipping_total();
         $params['discount'] = number_format($order->get_discount_total(), 2, '.', '');
         
 		if ($params['handling'] < 0) {
@@ -395,6 +404,7 @@ class WC_SC extends WC_Payment_Gateway
 		$params['version'] = '4.0.0';
 
         $payment_page = SC_Versions_Resolver::get_page_id($order, 'pay');
+    //    $payment_page = wc_get_page_permalink($page);
         
 		if ( get_option( 'woocommerce_force_ssl_checkout' ) == 'yes' ) {
             $payment_page = str_replace( 'http:', 'https:', $payment_page );
@@ -411,6 +421,7 @@ class WC_SC extends WC_Payment_Gateway
         // get and pass to cashier billing data
 		$params['first_name'] =
             urlencode(preg_replace("/[[:punct:]]/", '', SC_Versions_Resolver::get_order_data($order, 'billing_first_name')));
+        //    urlencode(preg_replace("/[[:punct:]]/", '', $this->get_order_data($order, 'billing_first_name')));
 		$params['last_name'] =
             urlencode(preg_replace("/[[:punct:]]/", '', SC_Versions_Resolver::get_order_data($order, 'billing_last_name')));
 		$params['address1'] =
@@ -433,44 +444,45 @@ class WC_SC extends WC_Payment_Gateway
         // get and pass to cashier billing data END
         
         // get and pass to cashier hipping data
-        $sh_f_name = urlencode(
-            preg_replace(
-                "/[[:punct:]]/",
-                '',
-                SC_Versions_Resolver::get_order_data($order, 'shipping_first_name')
-            )
-        );
+        $sh_f_name = urlencode(preg_replace(
+            "/[[:punct:]]/", '', SC_Versions_Resolver::get_order_data($order, 'shipping_first_name')));
         
         if(empty(trim($sh_f_name))) {
             $sh_f_name = $params['first_name'];
         }
         $params['shippingFirstName'] = $sh_f_name;
         
-        $sh_l_name = urlencode(preg_replace("/[[:punct:]]/", '', SC_Versions_Resolver::get_order_data($order, 'shipping_last_name')));
+        $sh_l_name = urlencode(preg_replace(
+            "/[[:punct:]]/", '', SC_Versions_Resolver::get_order_data($order, 'shipping_last_name')));
+        
         if(empty(trim($sh_l_name))) {
             $sh_l_name = $params['last_name'];
         }
         $params['shippingLastName'] = $sh_l_name;
         
-        $sh_addr = urlencode(preg_replace("/[[:punct:]]/", '', SC_Versions_Resolver::get_order_data($order, 'shipping_address_1')));
+        $sh_addr = urlencode(preg_replace(
+            "/[[:punct:]]/", '', SC_Versions_Resolver::get_order_data($order, 'shipping_address_1')));
         if(empty(trim($sh_addr))) {
             $sh_addr = $params['address1'];
         }
         $params['shippingAddress'] = $sh_addr;
         
-        $sh_city = urlencode(preg_replace("/[[:punct:]]/", '', SC_Versions_Resolver::get_order_data($order, 'shipping_city')));
+        $sh_city = urlencode(preg_replace(
+            "/[[:punct:]]/", '', SC_Versions_Resolver::get_order_data($order, 'shipping_city')));
         if(empty(trim($sh_city))) {
             $sh_city = $params['city'];
         }
         $params['shippingCity'] = $sh_city;
         
-        $sh_country = urlencode(preg_replace("/[[:punct:]]/", '', SC_Versions_Resolver::get_order_data($order, 'shipping_country')));
+        $sh_country = urlencode(preg_replace(
+            "/[[:punct:]]/", '', SC_Versions_Resolver::get_order_data($order, 'shipping_country')));
         if(empty(trim($sh_country))) {
             $sh_city = $params['country'];
         }
         $params['shippingCountry'] = $sh_country;
         
-        $sh_zip = urlencode(preg_replace("/[[:punct:]]/", '', SC_Versions_Resolver::get_order_data($order, 'shipping_postcode')));
+        $sh_zip = urlencode(preg_replace(
+            "/[[:punct:]]/", '', SC_Versions_Resolver::get_order_data($order, 'shipping_postcode')));
         if(empty(trim($sh_zip))) {
             $sh_zip = $params['zip'];
         }
@@ -895,6 +907,14 @@ class WC_SC extends WC_Payment_Gateway
         return array(
             'result' 	=> 'success',
             'redirect'	=> SC_Versions_Resolver::get_redirect_url($order),
+//            'redirect'	=> add_query_arg(
+//                array(
+//                    'order-pay' => $this->get_order_data($order, 'id'),
+//                    'key' => $this->get_order_data($order, 'order_key')
+//                ),
+//            //    self::get_page_id('pay')
+//                wc_get_page_permalink('pay')
+//            )
         );
     }
     
@@ -905,7 +925,9 @@ class WC_SC extends WC_Payment_Gateway
      */
     public function process_dmns()
     {
-        $this->create_log(@$_REQUEST, 'DMN receive with params: ');
+        $this->create_log(@$_REQUEST, 'Receive DMN with params: ');
+        
+        $req_status = $this->get_request_status();
         
         /* CASHIER DMN
          * 
@@ -947,10 +969,11 @@ class WC_SC extends WC_Payment_Gateway
         // REST API DMN
         elseif(strtolower($_REQUEST['wc-api']) == 'wc_sc_rest') {
             // catch Void 
+            // when we refund form CPanel we get transactionType = Void and Status = 'APPROVED'
             if(
-                @$_REQUEST['action'] == 'void'
+                (@$_REQUEST['action'] == 'void' || @$_REQUEST['transactionType'] == 'Void')
                 && !empty(@$_REQUEST['clientRequestId'])
-                && ($this->get_request_status() == 1 || $this->get_request_status() == 0)
+                && ($req_status == 1 || $req_status == 0 || $req_status == 'APPROVED')
             ) {
                 try {
                     $order = new WC_Order($_REQUEST['clientRequestId']);
@@ -1005,21 +1028,48 @@ class WC_SC extends WC_Payment_Gateway
             // catch Refund
             // in case the API fail,
             // see https://www.safecharge.com/docs/API/?json#refundTransaction -> Output Parameters
+            // when we refund form CPanel we get transactionType = Credit and Status = 'APPROVED'
             elseif(
-                @$_REQUEST['action'] == 'refund'
-                && !empty($this->get_request_status())
-                && !empty(@$_REQUEST['clientUniqueId'])
-                && !empty(@$_REQUEST['order_id'])
+                (@$_REQUEST['action'] == 'refund' || @$_REQUEST['transactionType'] == 'Credit')
+                && !empty($req_status)
             ) {
-                $order = new WC_Order($_REQUEST['order_id']);
+                // CPanel DMN
+                if($req_status == 'APPROVED' && @$_REQUEST['transactionType'] == 'Credit') {
+                    $order_id = @current(explode('_', $_REQUEST['invoice_id']));
+                    $order = new WC_Order($order_id);
+                    
+                    $resp = $this->sc_refund_order($order_id);
+                    
+                    if(is_a($resp, 'WP_Error')) {
+                        $this->create_log($resp->errors['error'][0], 'Order was not refunded: ');
+                        
+                        $order->add_order_note(__('DMN message: Your Refund request for Order #'
+                            . $order_id . ', faild with ERROR: '
+                            . $resp->errors['error'][0]));
+                    }
+                    elseif(is_a($resp, 'WC_Order_Refund')) {
+                        $this->create_log('', 'Order was refunded.');
+                        
+                        $order->update_status('refunded');
+                        $order -> add_order_note(__('DMN message: Your Refund request for Order #'
+                            .$order_id .', was successful.', 'sc'));
+                    }
+                    
+                    $order->save();
+                    
+                    echo 'DMN received.';
+                    exit;
+                }
                 
-                if($order) {
+                $order = new WC_Order(@$_REQUEST['order_id']);
+                
+                if(is_a($order, 'WC_Order')) {
                     $order_status = strtolower($order->get_status());
 
                     // change to Refund if request is Approved and the Order status is not Refunded
                     if(
                         $order_status !== 'refunded'
-                        && $this->get_request_status() == 'SUCCESS'
+                        && $req_status == 'SUCCESS'
                         && @$_REQUEST['transactionStatus'] == 'APPROVED'
                     ) {
                         $order->update_status('refunded');
@@ -1028,7 +1078,7 @@ class WC_SC extends WC_Payment_Gateway
                         
                         $order->save();
                     }
-                    elseif($this->get_request_status() == 'ERROR') {
+                    elseif($req_status == 'ERROR') {
                         $order -> add_order_note(__('DMN message: Your try to Refund #'
                             .$_REQUEST['clientUniqueId'] . ' faild with ERROR: "'
                             . @$_REQUEST['Reason'] . '".' , 'sc'));
@@ -1122,8 +1172,17 @@ class WC_SC extends WC_Payment_Gateway
         echo 'DMN received.';
         exit;
     }
+    
+    public function process_admin_options()
+    {
+        $this->create_log('', 'call function process_admin_options()');
+        add_action(
+            'woocommerce_update_options_payment_gateways',
+            array( $this, 'process_admin_options' )
+        );
+    }
 
-	public function sc_checkout_process()
+    public function sc_checkout_process()
     {
         $_SESSION['sc_subpayment'] = '';
         if(isset($_POST['payment_method_sc'])) {
@@ -1237,7 +1296,7 @@ class WC_SC extends WC_Payment_Gateway
                 . $this->get_request_status() . @$_REQUEST['productId']
         );
 
-        if ($str == $_REQUEST['advanceResponseChecksum']) {
+        if ($str == @$_REQUEST['advanceResponseChecksum']) {
             return true;
         }
         
@@ -1266,6 +1325,188 @@ class WC_SC extends WC_Payment_Gateway
         }
         
         return $protocol . $url;
+    }
+    
+    /**
+     * Function get_order_data
+     * Extract the data from the order.
+     * We use this function in index.php so it must be public.
+     * 
+     * @param WC_Order $order
+     * @param string $key - a key name to extract
+     */
+    public function get_order_data($order, $key = 'completed_date')
+    {
+        switch($key) {
+            case 'completed_date':
+                return $order->get_date_completed() ?
+                    gmdate( 'Y-m-d H:i:s', $order->get_date_completed()->getOffsetTimestamp() ) : '';
+
+            case 'paid_date':
+                return $order->get_date_paid() ?
+                    gmdate( 'Y-m-d H:i:s', $order->get_date_paid()->getOffsetTimestamp() ) : '';
+
+            case 'modified_date':
+                return $order->get_date_modified() ?
+                    gmdate( 'Y-m-d H:i:s', $order->get_date_modified()->getOffsetTimestamp() ) : '';
+
+            case 'order_date';
+                return $order->get_date_created() ?
+                    gmdate( 'Y-m-d H:i:s', $order->get_date_created()->getOffsetTimestamp() ) : '';
+
+            case 'id':
+                return $order->get_id();
+
+            case 'post':
+                return get_post( $order->get_id() );
+
+            case 'status':
+                return $order->get_status();
+
+            case 'post_status':
+                return get_post_status( $order->get_id() );
+
+            case 'customer_message':
+            case 'customer_note':
+                return $order->get_customer_note();
+
+            case 'user_id':
+            case 'customer_user':
+                return $order->get_customer_id();
+
+            case 'tax_display_cart':
+                return get_option( 'woocommerce_tax_display_cart' );
+
+            case 'display_totals_ex_tax':
+                return 'excl' === get_option( 'woocommerce_tax_display_cart' );
+
+            case 'display_cart_ex_tax':
+                return 'excl' === get_option( 'woocommerce_tax_display_cart' );
+
+            case 'cart_discount':
+                return $order->get_total_discount();
+
+            case 'cart_discount_tax':
+                return $order->get_discount_tax();
+
+            case 'order_tax':
+                return $order->get_cart_tax();
+
+            case 'order_shipping_tax':
+                return $order->get_shipping_tax();
+
+            case 'order_shipping':
+                return $order->get_shipping_total();
+
+            case 'order_total':
+                return $order->get_total();
+
+            case 'order_type':
+                return $order->get_type();
+
+            case 'order_currency':
+                return $order->get_currency();
+
+            case 'order_currency':
+                return $order->get_currency();
+
+            case 'order_version':
+                return $order->get_version();
+
+            case 'order_version':
+                return $order->get_version();
+
+            default:
+                return get_post_meta( $order->get_id(), '_' . $key, true );
+        }
+
+        // try to call {get_$key} method
+        if ( is_callable( array( $order, "get_{$key}" ) ) ) {
+            return $order->{"get_{$key}"}();
+        }
+    }
+    
+    /**
+     * Function process_refund
+     * A dummy function to enable auto refund in WC.
+     * 
+     * @param  int    $order_id Order ID.
+	 * @param  float  $amount Refund amount.
+	 * @param  string $reason Refund reason.
+     * 
+	 * @return boolean True or false based on success, or a WP_Error object.
+     */
+    public function process_refund( $order_id, $amount = null, $reason = '' ) {
+        return false;
+	}
+    
+    /**
+     * Function sc_refund_order
+     * Process Order Refund through Code
+     * 
+     * @param int $order_id
+     * @param string $refund_reason
+     * 
+     * @return WC_Order_Refund|WP_Error
+     */
+    private function sc_refund_order($order_id, $refund_reason = '')
+    {
+        if(!$this->checkAdvancedCheckSum()) {
+        //    return new WP_Error( 'error', __( 'The checkAdvancedCheckSum did not mutch!', 'sc' ) );
+        }
+        
+        $order  = wc_get_order( $order_id );
+        
+        // If it's something else such as a WC_Order_Refund, we don't want that.
+        if( ! is_a( $order, 'WC_Order') ) {
+            return new WP_Error( 'error', __( 'Provided ID is not a WC Order', 'sc' ) );
+        }
+        
+        if( $order->get_status() == 'refunded' ) {
+            return new WP_Error( 'error', __( 'Order has been already refunded', 'sc' ) );
+        }
+        
+        // Refund Amount
+        $refund_amount = 0;
+        // Prepare items which we are refunding
+        $items = array();
+        // Get Items
+        $order_items   = $order->get_items();
+        
+        if ( $order_items ) {
+            foreach( $order_items as $item_id => $item ) {
+                $tax_data = wc_get_order_item_meta($item_id, '_line_tax_data');
+                $refund_tax = 0;
+                
+                if(is_array($tax_data) && isset($tax_data['total']) && !empty($tax_data['total'])) {
+                    $refund_tax = wc_format_decimal($tax_data['total'] );
+                }
+                
+                $refund_amount += wc_format_decimal( $refund_amount )
+                    + wc_get_order_item_meta($item_id, '_line_total');
+                
+                $items[ $item_id ] = array( 
+                    'qty' => wc_get_order_item_meta($item_id, '_qty'), 
+                    'refund_total' => wc_format_decimal( wc_get_order_item_meta($item_id, '_line_total') ), 
+                    'refund_tax' =>  $refund_tax
+                );
+            }
+        }
+        
+        $refund = wc_create_refund( array(
+            'amount'         => $refund_amount,
+            'reason'         => $refund_reason,
+            'order_id'       => $order_id,
+            'line_items'     => $items,
+            'refund_payment' => true,
+            'restock_items'  => true
+        ));
+        
+        $this->create_log($refund_amount, 'Refund amount: ');
+        $this->create_log($order_id, 'Refund $order_id: ');
+        $this->create_log($items, 'Refund $items: ');
+        
+        return $refund;
     }
     
     /**
@@ -1400,7 +1641,6 @@ class WC_SC extends WC_Payment_Gateway
     
     private function formatLocation($locale)
     {
-        
 		switch ($locale){
             case 'de_DE':
 				return 'de';

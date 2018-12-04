@@ -231,41 +231,43 @@ function sc_create_refund()
     $notify_url = $wc_sc->set_notify_url();
     
     // get order refunds
-    $order = new WC_Order( (int)$_REQUEST['order_id'] );
-    $refunds = $order->get_refunds();
-    
-    if(!$refunds || !isset($refunds[0]) || !is_array($refunds[0]->data)) {
-        $order -> add_order_note(__('There are no refunds data. If refund was made, delete it manually!', 'sc'));
+    if(isset($_REQUEST['order_id'])) {
+        $order = new WC_Order( (int)$_REQUEST['order_id'] );
+        $refunds = $order->get_refunds();
+
+        if(!$refunds || !isset($refunds[0]) || !is_array($refunds[0]->data)) {
+            $order -> add_order_note(__('There are no refunds data. If refund was made, delete it manually!', 'sc'));
+            $order->save();
+            wp_send_json_success();
+        }
+
+        $order_meta_data = array(
+            'order_tr_id' => $order->get_meta(SC_GW_TRANS_ID_KEY),
+            'auth_code' => $order->get_meta(SC_AUTH_CODE_KEY),
+        );
+
+        // call refund method
+        require_once 'SC_REST_API.php';
+        $sc_api = new SC_REST_API();
+
+        // execute refund, the response must be array('msg' => 'some msg', 'new_order_status' => 'some status')
+        $resp = $sc_api->refund_order(
+            $wc_sc->settings
+            ,$refunds[0]->data
+            ,$order_meta_data
+            ,get_woocommerce_currency()
+            ,$notify_url . 'Rest&action=refund&order_id=' . $_REQUEST['order_id']
+        );
+
+        $order -> add_order_note(__($resp['msg'], 'sc'));
+
+        if(!empty($resp['new_order_status'])) {
+            $order->set_status($resp['new_order_status']);
+        }
+
         $order->save();
         wp_send_json_success();
     }
-    
-    $order_meta_data = array(
-        'order_tr_id' => $order->get_meta(SC_GW_TRANS_ID_KEY),
-        'auth_code' => $order->get_meta(SC_AUTH_CODE_KEY),
-    );
-    
-    // call refund method
-    require_once 'SC_REST_API.php';
-    $sc_api = new SC_REST_API();
-    
-    // execute refund, the response must be array('msg' => 'some msg', 'new_order_status' => 'some status')
-    $resp = $sc_api->refund_order(
-        $wc_sc->settings
-        ,$refunds[0]->data
-        ,$order_meta_data
-        ,get_woocommerce_currency()
-        ,$notify_url . 'Rest&action=refund&order_id=' . $_REQUEST['order_id']
-    );
-    
-    $order -> add_order_note(__($resp['msg'], 'sc'));
-    
-    if(!empty($resp['new_order_status'])) {
-        $order->set_status($resp['new_order_status']);
-    }
-    
-    $order->save();
-    wp_send_json_success();
 }
 
 function sc_check_checkout_apm()
@@ -288,7 +290,7 @@ function sc_add_buttons()
     
     if($order_status == 'completed') {
         # Data for the VOID
-        require_once 'WC_SC.php';
+    //    require_once 'WC_SC.php';
         require_once 'SC_REST_API.php';
         require_once 'SC_Versions_Resolver.php';
         
@@ -307,6 +309,7 @@ function sc_add_buttons()
             'clientRequestId'       => $time . '_' . $order_tr_id,
             'clientUniqueId'        => $order_tr_id,
             'amount'                => $sc_v_res->get_order_data($order, 'order_total'),
+        //    'amount'                => $wc_sc->get_order_data($order, 'order_total'),
             'currency'              => get_woocommerce_currency(),
             'relatedTransactionId'  => $order_tr_id,
             'authCode'              => $order->get_meta(SC_AUTH_CODE_KEY),
