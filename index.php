@@ -27,6 +27,7 @@ function woocommerce_sc_init()
     }
     
     require_once 'WC_SC.php';
+    require_once ABSPATH . 'wp-admin/includes/plugin.php';
     
     global $wc_sc;
     $wc_sc = new WC_SC();
@@ -34,87 +35,22 @@ function woocommerce_sc_init()
     add_filter('woocommerce_payment_gateways', 'woocommerce_add_sc_gateway' );
 	add_action('init', 'sc_enqueue'); // need WC_SC
 	add_action('woocommerce_thankyou_order_received_text', 'sc_show_final_text'); // need WC_SC
-    add_action('woocommerce_create_refund', 'sc_create_refund'); // need WC_SC
     // Check checkout for selected apm ONLY when payment api is REST
     add_action( 'woocommerce_checkout_process', 'sc_check_checkout_apm', 20 );
     // add void and/or settle buttons to completed orders
     add_action( 'woocommerce_order_item_add_action_buttons', 'sc_add_buttons'); // need WC_SC
+    // Refun hook, when create refund from WC, we do not want this to be activeted from DMN
+    add_action('woocommerce_create_refund', 'sc_create_refund'); // need WC_SC
+    
+    // for WPML plugin
+    if(is_plugin_active('sitepress-multilingual-cms' . DIRECTORY_SEPARATOR . 'sitepress.php')) {
+        add_filter( 'woocommerce_get_checkout_order_received_url', 'sc_wpml_thank_you_page', 10, 2 );
+    }
     
     // if the merchant needs to rewrite the DMN URL
-//    if(isset($wc_sc->settings['rewrite_dmn']) && $wc_sc->settings['rewrite_dmn'] == 'yes') {
-//        add_action('template_redirect', 'sc_rewrite_dmn'); // need WC_SC
-//    }
-    
-    register_setting("mw_options", "mw_options_wc_order_attachement_1", "mw_options_wc_order_attachement_1_handle");
-    add_action('admin_menu', 'test_button_menu');
-}
-
-function mw_options_wc_order_attachement_1()
-{
-    echo '<button type="button">Delete</button>';
-}
-
-function test_button_menu(){
-  add_menu_page('Test Button Page', 'Test Button', 'manage_options', 'test-button-slug', 'test_button_admin_page');
-
-}
-
-function test_button_admin_page() {
-
-  // This function creates the output for the admin page.
-  // It also checks the value of the $_POST variable to see whether
-  // there has been a form submission. 
-
-  // The check_admin_referer is a WordPress function that does some security
-  // checking and is recommended good practice.
-
-  // General check for user permissions.
-  if (!current_user_can('manage_options'))  {
-    wp_die( __('You do not have sufficient pilchards to access this page.')    );
-  }
-
-  // Start building the page
-
-  echo '<div class="wrap">';
-
-  echo '<h2>Test Button Demo</h2>';
-
-  // Check whether the button has been pressed AND also check the nonce
-  if (isset($_POST['test_button']) && check_admin_referer('test_button_clicked')) {
-    // the button has been pressed AND we've passed the security check
-    test_button_action();
-  }
-
-  echo '<form action="options-general.php?page=test-button-slug" method="post">';
-
-  // this is a WordPress security feature - see: https://codex.wordpress.org/WordPress_Nonces
-  wp_nonce_field('test_button_clicked');
-  echo '<input type="hidden" value="true" name="test_button" />';
-  submit_button('Call Function');
-  echo '</form>';
-
-  echo '</div>';
-
-}
-
-function test_button_action()
-{
-  echo '<div id="message" class="updated fade"><p>'
-    .'The "Call Function" button was clicked.' . '</p></div>';
-
-  $path = WP_TEMP_DIR . '/test-button-log.txt';
-
-  $handle = fopen($path,"w");
-
-  if ($handle == false) {
-    echo '<p>Could not write the log file to the temporary directory: ' . $path . '</p>';
-  }
-  else {
-    echo '<p>Log of button click written to: ' . $path . '</p>';
-
-    fwrite ($handle , "Call Function button clicked on: " . date("D j M Y H:i:s", time())); 
-    fclose ($handle);
-  }
+    if(isset($wc_sc->settings['rewrite_dmn']) && $wc_sc->settings['rewrite_dmn'] == 'yes') {
+        add_action('template_redirect', 'sc_rewrite_dmn'); // need WC_SC
+    }
 }
 
 /**
@@ -132,7 +68,7 @@ function sc_enqueue($hook)
     global $wc_sc;
     
     # DMNs catch
-    if(isset($_REQUEST['wc-api']) && !empty($_REQUEST['wc-api'])) {
+    if(isset($_REQUEST['wc-api']) && $_REQUEST['wc-api'] == 'sc_listener') {
         $wc_sc->process_dmns();
     }
     
@@ -224,49 +160,53 @@ function sc_show_final_text()
 
 function sc_create_refund()
 {
-    // get GW so we can use its settings
-    require_once 'WC_SC.php';
-    global $wc_sc;
-    
-    $notify_url = $wc_sc->set_notify_url();
-    
-    // get order refunds
-    if(isset($_REQUEST['order_id'])) {
-        $order = new WC_Order( (int)$_REQUEST['order_id'] );
-        $refunds = $order->get_refunds();
+    if(!isset($_REQUEST['wc-api'])) {
+        // get GW so we can use its settings
+        require_once 'WC_SC.php';
+        global $wc_sc;
 
-        if(!$refunds || !isset($refunds[0]) || !is_array($refunds[0]->data)) {
-            $order -> add_order_note(__('There are no refunds data. If refund was made, delete it manually!', 'sc'));
+        $notify_url = $wc_sc->set_notify_url();
+
+        // get order refunds
+        if(isset($_REQUEST['order_id'])) {
+            $order = new WC_Order( (int)$_REQUEST['order_id'] );
+            $refunds = $order->get_refunds();
+
+            if(!$refunds || !isset($refunds[0]) || !is_array($refunds[0]->data)) {
+                $order -> add_order_note(__('There are no refunds data. If refund was made, delete it manually!', 'sc'));
+                $order->save();
+                wp_send_json_success();
+            }
+
+            $order_meta_data = array(
+                'order_tr_id' => $order->get_meta(SC_GW_TRANS_ID_KEY),
+                'auth_code' => $order->get_meta(SC_AUTH_CODE_KEY),
+            );
+
+            // call refund method
+            require_once 'SC_REST_API.php';
+            $sc_api = new SC_REST_API();
+
+            // execute refund, the response must be array('msg' => 'some msg', 'new_order_status' => 'some status')
+            $resp = $sc_api->refund_order(
+                $wc_sc->settings
+                ,$refunds[0]->data
+                ,$order_meta_data
+                ,get_woocommerce_currency()
+                ,$notify_url . 'sc_listener&action=refund&order_id=' . $_REQUEST['order_id']
+            );
+
+            $order->add_order_note(__($resp['msg'], 'sc'));
+
+            create_log($resp, 'Refund response from sc_create_refund(): ');
+
+    //        if(!empty($resp['new_order_status'])) {
+    //            $order->set_status($resp['new_order_status']);
+    //        }
+
             $order->save();
             wp_send_json_success();
         }
-
-        $order_meta_data = array(
-            'order_tr_id' => $order->get_meta(SC_GW_TRANS_ID_KEY),
-            'auth_code' => $order->get_meta(SC_AUTH_CODE_KEY),
-        );
-
-        // call refund method
-        require_once 'SC_REST_API.php';
-        $sc_api = new SC_REST_API();
-
-        // execute refund, the response must be array('msg' => 'some msg', 'new_order_status' => 'some status')
-        $resp = $sc_api->refund_order(
-            $wc_sc->settings
-            ,$refunds[0]->data
-            ,$order_meta_data
-            ,get_woocommerce_currency()
-            ,$notify_url . 'Rest&action=refund&order_id=' . $_REQUEST['order_id']
-        );
-
-        $order -> add_order_note(__($resp['msg'], 'sc'));
-
-        if(!empty($resp['new_order_status'])) {
-            $order->set_status($resp['new_order_status']);
-        }
-
-        $order->save();
-        wp_send_json_success();
     }
 }
 
@@ -315,7 +255,7 @@ function sc_add_buttons()
             'authCode'              => $order->get_meta(SC_AUTH_CODE_KEY),
             
             'urlDetails'            => array('notificationUrl' => $notify_url
-                .'Rest&action=void&clientRequestId=' . $_REQUEST['post']),
+                .'sc_listener&action=void&clientRequestId=' . $_REQUEST['post']),
             
             'timeStamp'             => $time,
             // optional fields for sc_ajax.php
@@ -382,6 +322,24 @@ function sc_rewrite_dmn()
             exit;
         }
     }
+}
+
+/**
+ * Function sc_wpml_thank_you_page
+ * Fix for WPML plugin "Thank you" page
+ * 
+ * @param string $order_received_url
+ * @param WC_Order $order
+ * @return string $order_received_url
+ */
+function sc_wpml_thank_you_page( $order_received_url, $order )
+{
+    $lang_code = get_post_meta( $order->id, 'wpml_language', true );
+    $order_received_url = apply_filters( 'wpml_permalink', $order_received_url , $lang_code );
+    
+    create_log($order_received_url, 'sc_wpml_thank_you_page: ');
+ 
+    return $order_received_url;
 }
 
 /**

@@ -15,7 +15,7 @@ var billing_country_first_val = '';
   * Function validateScAPMsModal
   * When click save on modal, check for mandatory fields and validate them.
   */
- function scValidateAPMFields() {
+function scValidateAPMFields() {
     var formValid = true;
      
     if(jQuery('li.apm_container').length > 0) {
@@ -114,7 +114,7 @@ var billing_country_first_val = '';
   * 
   * @param {object} resp
   */
- function safechargeResultHandler(resp) {
+function safechargeResultHandler(resp) {
     if(resp.status == 'ERROR') {
         jQuery('#custom_loader').hide();
         
@@ -148,7 +148,7 @@ var billing_country_first_val = '';
   * 
   * @param {int} elemId
   */
- function showErrorLikeInfo(elemId) {
+function showErrorLikeInfo(elemId) {
     jQuery('#error_'+elemId).addClass('error_info');
 
     if(jQuery('#error_'+elemId).css('display') == 'block') {
@@ -159,7 +159,7 @@ var billing_country_first_val = '';
     }
  }
  
- function getAPMs() {
+function getAPMs() {
     if(jQuery("#billing_country").val() != billing_country_first_val) {
         manualChangedCountry = true;
         billing_country_first_val = jQuery("#billing_country").val();
@@ -334,8 +334,8 @@ var billing_country_first_val = '';
     }
  }
  
- // when the admin select to Void the Order
- function cancelOrder(question, orderId) {
+// when the admin select to Void the Order
+function cancelOrder(question, orderId) {
     if(confirm(question)) {
         jQuery('#custom_loader').show();
         
@@ -353,7 +353,8 @@ var billing_country_first_val = '';
                 ) {
                     // call DMN page:
                     jQuery.ajax({
-                        url: '//' + window.location.host +'/?wc-api=WC_SC_Rest&action=void&Status='
+                    //    url: '//' + window.location.host +'/?wc-api=WC_SC_Rest&action=void&Status='
+                        url: '//' + window.location.host +'/?wc-api=sc_listener&action=void&Status='
                             +resp.status +'&clientRequestId='+ orderId +'&msg='+ resp.msg,
                         dataType: 'text'
                     })

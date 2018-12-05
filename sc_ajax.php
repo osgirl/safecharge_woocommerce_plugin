@@ -24,9 +24,85 @@ if(
         ,$_SESSION['SC_Variables']['test']
     )
     && $_SERVER['HTTP_X_REQUESTED_WITH'] == 'XMLHttpRequest'
-    // when we cancel order we no need to use rest as value for the payment_api
-    && ($_SESSION['SC_Variables']['payment_api'] == 'rest' || isset($_POST['cancelOrder']))
+    // when we cancel order or delete logs we no need to use rest as value for the payment_api
+//    && (
+//        $_SESSION['SC_Variables']['payment_api'] == 'rest'
+//        || isset($_POST['cancelOrder'])
+//        || isset($_POST['deleteLogs'])
+//    )
+    && !empty($_SESSION['SC_Variables']['merchantId'])
+    && !empty($_SESSION['SC_Variables']['merchantSiteId'])
+    && in_array($_SESSION['SC_Variables']['payment_api'], array('cashier', 'rest'))
 ) {
+    require_once 'SC_REST_API.php';
+    
+    if($_SESSION['SC_Variables']['payment_api'] == 'rest') {
+        require_once 'SC_REST_API.php';
+        
+        // when we want Session Token
+        if(isset($_POST['needST']) && $_POST['needST'] == 1) {
+            SC_REST_API::get_session_token($_SESSION['SC_Variables'], true);
+        }
+        // when we want APMs
+        else {
+            // if the Country come as POST variable
+            if(empty($_SESSION['SC_Variables']['sc_country'])) {
+                $_SESSION['SC_Variables']['sc_country'] = $_POST['country'];
+            }
+
+            SC_REST_API::get_rest_apms($_SESSION['SC_Variables'], true);
+        }
+        
+        exit;
+    }
+    // here we no need REST API
+    else {
+        // when merchant cancel the order via Void button
+        if(isset($_POST['cancelOrder']) && $_POST['cancelOrder'] == 1) {
+            SC_REST_API::cancel_order($_SESSION['SC_Variables'], true);
+            unset($_SESSION['SC_Variables']);
+            exit;
+        }
+        
+        // When user want to delete logs.
+        if(isset($_POST['deleteLogs']) && $_POST['deleteLogs'] == 1) {
+            $logs = array();
+            $logs_dir = dirname(__FILE__) . DIRECTORY_SEPARATOR . 'logs' . DIRECTORY_SEPARATOR;
+
+            foreach(scandir($logs_dir) as $file) {
+                if($file != '.' && $file != '..' && $file != '.htaccess') {
+                    $logs[] = $file;
+                }
+            }
+
+            if(count($logs) > 30) {
+                sort($logs);
+
+                for($cnt = 0; $cnt < 30; $cnt++) {
+                    if(is_file($logs_dir . $logs[$cnt])) {
+                        if(!unlink($logs_dir . $logs[$cnt])) {
+                            echo json_encode(array(
+                                'status' => 0,
+                                'msg' => 'Error when try to delete file: ' . $logs[$cnt]
+                            ));
+                            exit;
+                        }
+                    }
+                }
+
+                echo json_encode(array('status' => 1, 'msg' => ''));
+            }
+            else {
+                echo json_encode(array('status' => 0, 'msg' => 'The log files are less than 30.'));
+            }
+
+            exit;
+        }
+    }
+    
+    /*
+     * the old code
+     * 
     require_once 'SC_REST_API.php';
     
     // when we want Session Token
@@ -88,6 +164,7 @@ if(
         
         SC_REST_API::get_rest_apms($_SESSION['SC_Variables'], true);
     }
+     */
 }
 elseif(
     @$_SERVER['HTTP_X_REQUESTED_WITH'] == 'XMLHttpRequest'
