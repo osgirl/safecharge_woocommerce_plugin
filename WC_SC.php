@@ -52,6 +52,8 @@ class WC_SC extends WC_Payment_Gateway
 		$this->payment_api      = @$this->settings['payment_api'] ? $this->settings['payment_api'] : 'cashier';
 		$this->transaction_type = @$this->settings['transaction_type'] ? $this->settings['transaction_type'] : 'sale';
 		$this->rewrite_dmn      = @$this->settings['rewrite_dmn'] ? $this->settings['rewrite_dmn'] : 'no';
+		$this->use_wpml_thanks_page =
+            @$this->settings['use_wpml_thanks_page'] ? $this->settings['use_wpml_thanks_page'] : 'no';
         // to enable auto refund support
         $this->supports         = array('products', 'refunds');
         
@@ -193,10 +195,17 @@ class WC_SC extends WC_Payment_Gateway
                 'label' => __('Force protocol where receive DMNs to be HTTP. You must have valid certificate for HTTPS! In case the checkbox is not set the default Protocol will be used.', 'sc'),
                 'default' => 'no'
             ),
+            // actually this is not for the DMN, but for return URL after Cashier page
             'rewrite_dmn' => array(
                 'title' => __('Rewrite DMN', 'sc'),
                 'type' => 'checkbox',
                 'label' => __('Check this option ONLY when URL symbols like "+", " " and "%20" in the DMN cause error 404 - Page not found.', 'sc'),
+                'default' => 'no'
+            ),
+            'use_wpml_thanks_page' => array(
+                'title' => __('Use WPML "Thank you" page.', 'sc'),
+                'type' => 'checkbox',
+                'label' => __('Works only if you have installed and configured WPML plugin.', 'sc'),
                 'default' => 'no'
             ),
             'show_thanks_msg' => array(
@@ -1043,8 +1052,12 @@ class WC_SC extends WC_Payment_Gateway
             (@$_REQUEST['action'] == 'refund' || @$_REQUEST['transactionType'] == 'Credit')
             && !empty($req_status)
         ) {
-            // CPanel DMN
-            if($req_status == 'APPROVED' && @$_REQUEST['transactionType'] == 'Credit') {
+            // CPanel DMN, from it we do not recieve $_GET['action'] parameter
+            if(
+                @$_REQUEST['action'] != 'refund'
+                && $req_status == 'APPROVED'
+                && @$_REQUEST['transactionType'] == 'Credit'
+            ) {
                 $this->create_log('', 'CPanel Refund DMN');
                 
                 $order_id = @current(explode('_', $_REQUEST['invoice_id']));
@@ -1094,7 +1107,7 @@ class WC_SC extends WC_Payment_Gateway
                 && $req_status == 'SUCCESS'
                 && @$_REQUEST['transactionStatus'] == 'APPROVED'
             ) {
-                $order->update_status('refunded');
+            //    $order->update_status('refunded');
                 $order -> add_order_note(__('DMN message: Your request - Refund #' .
                     $_REQUEST['clientUniqueId'] . ', was successful.', 'sc'));
 
@@ -1199,257 +1212,6 @@ class WC_SC extends WC_Payment_Gateway
         
         echo 'DMN was not recognized.';
         exit;
-        
-        
-        /* 
-         * THE OLD CODE
-         * 
-         * CASHIER DMN
-         * 
-         * Skip order status update if currentlly received status is 'pending' and curent order status is 'completed'.
-         * For the rest of the cases the status should be updated. 
-        */
-        /*
-        if(
-        //    strtolower($_REQUEST['wc-api']) == 'wc_gateway_sc'
-        //    strtolower($_REQUEST['wc-api']) == 'sc_listener'
-            isset($_REQUEST['invoice_id'])
-            && !empty($_REQUEST['invoice_id'])
-            && !empty($this->get_request_status())
-            && $this->checkAdvancedCheckSum()
-        ) {
-            $arr = explode("_", $_REQUEST['invoice_id']);
-
-            if(is_array($arr) && !empty($arr)) {
-                $order_id  = $arr[0];
-                
-                try {
-                    $order = new WC_Order($order_id);
-                    $order_status = strtolower($order->get_status());
-                    
-                    if(strtolower($this->get_request_status()) == 'pending' && $order_status == 'completed') {
-                        // do nothing here
-                    }
-                    else {
-                        $this->change_order_status($order, $order_id, $this->get_request_status(), @$_REQUEST['transactionType']);
-                    }
-                }
-                catch (Exception $ex) {
-                    $this->create_log($ex->getMessage(), 'process_dmns() Cashier DMN Exception: ');
-                    echo 'Exception - probably invalid order number. ';
-                }
-            }
-            else {
-                $this->create_log($_REQUEST["invoice_id"], '$_REQUEST["invoice_id"] is not proper format.');
-            }
-        }
-        // REST API DMN
-    //    elseif(strtolower($_REQUEST['wc-api']) == 'wc_sc_rest') {
-        else {
-            // catch Void 
-            // when we refund form CPanel we get transactionType = Void and Status = 'APPROVED'
-            if(
-                (@$_REQUEST['action'] == 'void' || @$_REQUEST['transactionType'] == 'Void')
-                && !empty(@$_REQUEST['clientRequestId'])
-                && ($req_status == 1 || $req_status == 0 || $req_status == 'APPROVED')
-            ) {
-                try {
-                    $order = new WC_Order($_REQUEST['clientRequestId']);
-                    
-                    if($order) {
-                        $order_status = strtolower($order->get_status());
-
-                        // change order status to canceld
-                        if(
-                            $this->get_request_status() == 1
-                            && $order_status != 'canceled'
-                            && $order_status != 'cancelled'
-                        ) {
-                            $order->add_order_note(__('DMN message: Your Void request was success, Order #'
-                                .$_REQUEST['clientRequestId'] . ' was canceld.', 'sc'));
-
-                            $order->update_status('cancelled');
-                            $order->save();
-                        }
-                        else {
-                            $msg = 'DMN message: Your Void request fail with message: "';
-
-                            // in case DMN URL was rewrited all spaces were replaces with "_"
-                            if(@$_REQUEST['wc_sc_redirected'] == 1) {
-                                $msg .= str_replace('_', ' ', @$_REQUEST['msg']);
-                            }
-                            else {
-                                $msg .= @$_REQUEST['msg'];
-                            }
-
-                            $msg .= '". Order #'  . $_REQUEST['clientRequestId']
-                                .' was not canceld!';
-
-                            $order -> add_order_note(__($msg, 'sc'));
-                            $order->save();
-                        }
-                    }
-                    else {
-                        echo 'There is no Order. ';
-                    }
-                }
-                catch (Exception $ex) {
-                    $this->create_log(
-                        $ex->getMessage(),
-                        'process_dmns() REST API DMN DMN Exception: probably invalid order number'
-                    );
-                    
-                    $order = false;
-                }
-            }
-            
-            // catch Refund
-            // in case the API fail,
-            // see https://www.safecharge.com/docs/API/?json#refundTransaction -> Output Parameters
-            // when we refund form CPanel we get transactionType = Credit and Status = 'APPROVED'
-            elseif(
-                (@$_REQUEST['action'] == 'refund' || @$_REQUEST['transactionType'] == 'Credit')
-                && !empty($req_status)
-            ) {
-                // CPanel DMN
-                if($req_status == 'APPROVED' && @$_REQUEST['transactionType'] == 'Credit') {
-                    $order_id = @current(explode('_', $_REQUEST['invoice_id']));
-                    $order = new WC_Order($order_id);
-                    
-                    $resp = $this->sc_refund_order($order_id);
-                    
-                    if(is_a($resp, 'WP_Error')) {
-                        $this->create_log($resp->errors['error'][0], 'Order was not refunded: ');
-                        
-                        $order->add_order_note(__('DMN message: Your Refund request for Order #'
-                            . $order_id . ', faild with ERROR: '
-                            . $resp->errors['error'][0]));
-                    }
-                    elseif(is_a($resp, 'WC_Order_Refund')) {
-                        $this->create_log('', 'Order was refunded.');
-                        
-                        $order->update_status('refunded');
-                        $order -> add_order_note(__('DMN message: Your Refund request for Order #'
-                            .$order_id .', was successful.', 'sc'));
-                    }
-                    
-                    $order->save();
-                    
-                    echo 'DMN received.';
-                    exit;
-                }
-                
-                $order = new WC_Order(@$_REQUEST['order_id']);
-                
-                if(is_a($order, 'WC_Order')) {
-                    $order_status = strtolower($order->get_status());
-
-                    // change to Refund if request is Approved and the Order status is not Refunded
-                    if(
-                        $order_status !== 'refunded'
-                        && $req_status == 'SUCCESS'
-                        && @$_REQUEST['transactionStatus'] == 'APPROVED'
-                    ) {
-                        $order->update_status('refunded');
-                        $order -> add_order_note(__('DMN message: Your request - Refund #' .
-                            $_REQUEST['clientUniqueId'] . ', was successful.', 'sc'));
-                        
-                        $order->save();
-                    }
-                    elseif($req_status == 'ERROR') {
-                        $order -> add_order_note(__('DMN message: Your try to Refund #'
-                            .$_REQUEST['clientUniqueId'] . ' faild with ERROR: "'
-                            . @$_REQUEST['Reason'] . '".' , 'sc'));
-                        
-                        $order->save();
-                    }
-                    elseif(
-                        @$_REQUEST['transactionStatus'] == 'DECLINED'
-                        || @$_REQUEST['transactionStatus'] == 'ERROR'
-                    ) {
-                        $msg = 'DMN message: Your try to Refund #' . $_REQUEST['clientUniqueId']
-                            .' faild with ERROR: "';
-                        
-                        // in case DMN URL was rewrited all spaces were replaces with "_"
-                        if(@$_REQUEST['wc_sc_redirected'] == 1) {
-                            $msg .= str_replace('_', ' ', @$_REQUEST['gwErrorReason']);
-                        }
-                        else {
-                            $msg .= @$_REQUEST['gwErrorReason'];
-                        }
-                        
-                        $msg .= '".';
-                        
-                        $order -> add_order_note(__($msg, 'sc'));
-                        $order->save();
-                    }
-                }
-                else {
-                    echo 'There is no Order. ';
-                }
-            }
-            
-            // catch the DMN when use D3D and P3D payment
-            // the idea here is to get $_REQUEST['paResponse'] and pass it to P3D
-            elseif(
-                @$_REQUEST['action'] == 'p3d'
-            ) {
-                $this->create_log($_REQUEST, 'DMN from issuer/bank: ');
-                
-                // the DMN from step 1 - issuer/bank
-                if(
-                    isset($_SESSION['SC_P3D_Params'], $_REQUEST['paResponse'])
-                    && !is_array($_SESSION['SC_P3D_Params'])
-                ) {
-                    $_SESSION['SC_P3D_Params']['paResponse'] = $_REQUEST['paResponse'];
-                    $this->pay_with_d3d_p3d();
-                }
-                // the DMN form step 2 - p3d
-                elseif(isset($_REQUEST['merchantId'], $_REQUEST['merchantSiteId'])) {
-                    // TODO
-                    // here we must unset $_SESSION['SC_P3D_Params'] as last step
-                    try {
-                        $order = new WC_Order(@$_REQUEST['clientUniqueId']);
-                    
-                        $this->change_order_status(
-                            $order
-                            ,@$_REQUEST['clientUniqueId']
-                            ,$this->get_request_status()
-                            ,@$_REQUEST['transactionType']
-                        );
-                    }
-                    catch (Exception $ex) {
-                        $this->create_log(
-                            $ex->getMessage(),
-                            'process_dmns() REST API DMN DMN Exception: '
-                        );
-                    }
-                }
-            }
-            elseif(!isset($_REQUEST['action']) && $this->checkAdvancedCheckSum()) {
-                try {
-                    $order = new WC_Order(@$_REQUEST['clientUniqueId']);
-                    
-                    $this->change_order_status(
-                        $order
-                        ,@$_REQUEST['clientUniqueId']
-                        ,$this->get_request_status()
-                        ,@$_REQUEST['transactionType']
-                    );
-                }
-                catch (Exception $ex) {
-                    $this->create_log(
-                        $ex->getMessage(),
-                        'process_dmns() REST API DMN DMN Exception: '
-                    );
-                }
-            }
-        }
-        
-        // stop script here or we will get code 400
-        echo 'DMN received.';
-        exit;
-         */
     }
     
     public function sc_checkout_process()
@@ -1737,7 +1499,6 @@ class WC_SC extends WC_Payment_Gateway
         if( $order->get_status() == 'refunded' ) {
             return new WP_Error( 'error', __( 'Order has been already refunded', 'sc' ) );
         }
-        $this->create_log('', 'call sc_refund_order 2');
         
         // Refund Amount
         $refund_amount = 0;
@@ -1746,8 +1507,6 @@ class WC_SC extends WC_Payment_Gateway
         $items = array();
         // Get Items
         $order_items   = $order->get_items();
-        
-        $this->create_log('', 'call sc_refund_order 3');
         
         if ( $order_items ) {
             foreach( $order_items as $item_id => $item ) {
@@ -1773,8 +1532,6 @@ class WC_SC extends WC_Payment_Gateway
             $refund_amount = $req_refund_amount;
         }
         
-        $this->create_log('', 'call sc_refund_order 4');
-        
         $refund = wc_create_refund( array(
             'amount'         => $refund_amount,
             'reason'         => $refund_reason,
@@ -1786,8 +1543,6 @@ class WC_SC extends WC_Payment_Gateway
         $this->create_log($refund_amount, 'Refund amount: ');
         $this->create_log($order_id, 'Refund $order_id: ');
         $this->create_log($items, 'Refund $items: ');
-        
-        $this->create_log('', 'call sc_refund_order 5');
         
         return $refund;
     }

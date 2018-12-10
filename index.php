@@ -31,7 +31,7 @@ function woocommerce_sc_init()
     
     global $wc_sc;
     $wc_sc = new WC_SC();
- 
+    
     add_filter('woocommerce_payment_gateways', 'woocommerce_add_sc_gateway' );
 	add_action('init', 'sc_enqueue'); // need WC_SC
 	add_action('woocommerce_thankyou_order_received_text', 'sc_show_final_text'); // need WC_SC
@@ -43,13 +43,16 @@ function woocommerce_sc_init()
     add_action('woocommerce_create_refund', 'sc_create_refund'); // need WC_SC
     
     // for WPML plugin
-    if(is_plugin_active('sitepress-multilingual-cms' . DIRECTORY_SEPARATOR . 'sitepress.php')) {
+    if(
+        is_plugin_active('sitepress-multilingual-cms' . DIRECTORY_SEPARATOR . 'sitepress.php')
+        && $wc_sc->settings['use_wpml_thanks_page'] == 'yes'
+    ) {
         add_filter( 'woocommerce_get_checkout_order_received_url', 'sc_wpml_thank_you_page', 10, 2 );
     }
     
     // if the merchant needs to rewrite the DMN URL
     if(isset($wc_sc->settings['rewrite_dmn']) && $wc_sc->settings['rewrite_dmn'] == 'yes') {
-        add_action('template_redirect', 'sc_rewrite_dmn'); // need WC_SC
+        add_action('template_redirect', 'sc_rewrite_return_url'); // need WC_SC
     }
 }
 
@@ -66,7 +69,7 @@ function woocommerce_add_sc_gateway($methods)
 function sc_enqueue($hook)
 {
     global $wc_sc;
-    
+        
     # DMNs catch
     if(isset($_REQUEST['wc-api']) && $_REQUEST['wc-api'] == 'sc_listener') {
         $wc_sc->process_dmns();
@@ -185,10 +188,9 @@ function sc_create_refund()
 
             // call refund method
             require_once 'SC_REST_API.php';
-            $sc_api = new SC_REST_API();
 
             // execute refund, the response must be array('msg' => 'some msg', 'new_order_status' => 'some status')
-            $resp = $sc_api->refund_order(
+            $resp = SC_REST_API::refund_order(
                 $wc_sc->settings
                 ,$refunds[0]->data
                 ,$order_meta_data
@@ -295,13 +297,13 @@ function sc_add_buttons()
 }
 
 /**
- * Function sc_rewrite_dmn
+ * Function sc_rewrite_return_url
  * When user have problem with white spaces in the URL, it have option to
- * rewrite the DMN URL and redirect to new one.
+ * rewrite the return URL and redirect to new one.
  * 
  * @global WC_SC $wc_sc
  */
-function sc_rewrite_dmn()
+function sc_rewrite_return_url()
 {
     global $wc_sc;
     $new_url = '';
@@ -311,7 +313,8 @@ function sc_rewrite_dmn()
         isset($_REQUEST['ppp_status']) && $_REQUEST['ppp_status'] != ''
         && (!isset($_REQUEST['wc_sc_redirected']) || $_REQUEST['wc_sc_redirected'] == 0)
     ) {
-        $host = $wc_sc->get_return_url();
+    //    $host = $wc_sc->get_return_url();
+        $host = (strpos($_SERVER["SERVER_PROTOCOL"], 'HTTP/') !== false ? 'http' : 'https') . '://' . $_SERVER['HTTP_HOST'] . current(explode('?', $_SERVER['REQUEST_URI']));
         
         if(isset($_SERVER['QUERY_STRING']) && $_SERVER['QUERY_STRING'] != '') {
             $new_url = preg_replace('/\+|\s|\%20/', '_', $_SERVER['QUERY_STRING']);

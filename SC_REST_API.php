@@ -106,7 +106,7 @@ class SC_REST_API
         if($json_arr === false) {
             return array(
                 'msg' => 'The REST API retun false. ' . $error_note,
-                'new_order_status' => ''
+                'new_order_status' => '',
             );
         }
         
