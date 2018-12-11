@@ -334,15 +334,24 @@ function getAPMs() {
     }
  }
  
-// when the admin select to Void the Order
-function cancelOrder(question, orderId) {
+// when the admin select to Settle or Void the Order
+function settleAndCancelOrder(question, action, orderId) {
     if(confirm(question)) {
         jQuery('#custom_loader').show();
+        
+        var data = {};
+        
+        if(action == 'settle') {
+            data.settleOrder = 1;
+        }
+        else if(action == 'void') {
+            data.cancelOrder = 1;
+        }
         
         jQuery.ajax({
             type: "POST",
             url: myAjax.ajaxurl,
-            data: { cancelOrder: 1 },
+            data: data,
             dataType: 'json'
         })
             .done(function(resp) {
@@ -353,9 +362,9 @@ function cancelOrder(question, orderId) {
                 ) {
                     // call DMN page:
                     jQuery.ajax({
-                    //    url: '//' + window.location.host +'/?wc-api=WC_SC_Rest&action=void&Status='
-                        url: '//' + window.location.host +'/?wc-api=sc_listener&action=void&Status='
-                            +resp.status +'&clientRequestId='+ orderId +'&msg='+ resp.msg,
+                        url: '//' + window.location.host +'/?wc-api=sc_listener&action='
+                            + action+'&Status='  + resp.status +'&clientRequestId='
+                            + orderId +'&msg='+ resp.msg,
                         dataType: 'text'
                     })
                         .complete(function(resp){
@@ -368,20 +377,6 @@ function cancelOrder(question, orderId) {
     }
  }
  
- // when user hit the Settle button
- function settleOrder(question, orderId) {
-     if(confirm(question)) {
-        jQuery('#custom_loader').show();
-        
-        jQuery.ajax({
-            type: "POST",
-            url: myAjax.ajaxurl,
-            data: { settlelOrder: 1 },
-            dataType: 'json'
-        })
-     }
- }
-
 /**
  * Function deleteOldestLogs
  * Delete the oldest logs in Logs directory.

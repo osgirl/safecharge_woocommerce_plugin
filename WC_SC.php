@@ -175,7 +175,7 @@ class WC_SC extends WC_Payment_Gateway
             'transaction_type' => array(
                 'title' => __('Transaction Type', 'sc'),
                 'type' => 'select',
-                'description' => __('Select preferred Transaction Type.', 'sc'),
+                'description' => __('Select preferred Transaction Type.<br/>Just in case goto WooCommerce > Settings > Products > Inventory and remove any value that is present in the Hold Stock (minutes) field.', 'sc'),
                 'options' => array(
                     'Auth' => 'Auth and Settle',
                     'Sale' => 'Sale',

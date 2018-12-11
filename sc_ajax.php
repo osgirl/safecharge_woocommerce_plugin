@@ -53,14 +53,14 @@ if(
     else {
         // when merchant settle the order via Settle button
         if(isset($_POST['settleOrder']) && $_POST['settleOrder'] == 1) {
-            SC_REST_API::settle_order($_SESSION['SC_Variables'], true);
+            SC_REST_API::void_and_settle_order($_SESSION['SC_Variables'], 'settle', true);
             unset($_SESSION['SC_Variables']);
             exit;
         }
         
         // when merchant cancel the order via Void button
         if(isset($_POST['cancelOrder']) && $_POST['cancelOrder'] == 1) {
-            SC_REST_API::cancel_order($_SESSION['SC_Variables'], true);
+            SC_REST_API::void_and_settle_order($_SESSION['SC_Variables'], 'void', true);
             unset($_SESSION['SC_Variables']);
             exit;
         }
