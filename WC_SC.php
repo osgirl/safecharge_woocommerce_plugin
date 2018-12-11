@@ -1605,8 +1605,14 @@ class WC_SC extends WC_Payment_Gateway
 
             case 'APPROVED':
                 $message = 'The amount has been authorized and captured by '
-                    .SC_GATEWAY_TITLE .'. PPP_TransactionID = '
-                    .@$request['PPP_TransactionID'] .", Status = ". $status;
+                    . SC_GATEWAY_TITLE . '. ';
+                
+                if($transactionType == 'Auth') {
+                    $message = 'The amount has been authorized and wait to for Settle. ';
+                }
+                
+                $message .= 'PPP_TransactionID = ' . @$request['PPP_TransactionID']
+                    . ", Status = ". $status;
 
                 if($transactionType) {
                     $message .= ", TransactionType = ". $transactionType;
@@ -1618,10 +1624,12 @@ class WC_SC extends WC_Payment_Gateway
                 $this->msg['class'] = 'woocommerce_message';
                 $order->payment_complete($order_id);
                 
-                $order->update_status( 'completed' );
+                $order->update_status($transactionType == 'Auth' ? 'pending' : 'completed');
                 
-                $order->add_order_note(SC_GATEWAY_TITLE .' payment is successful<br/>Unique Id: '
-                    .@$request['PPP_TransactionID']);
+                if($transactionType != 'Auth') {
+                    $order->add_order_note(SC_GATEWAY_TITLE . ' payment is successful<br/>Unique Id: '
+                        . @$request['PPP_TransactionID']);
+                }
 
                 $order->add_order_note($this->msg['message']);
                 $woocommerce->cart->empty_cart();

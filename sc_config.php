@@ -101,6 +101,16 @@ else {
     define('SC_TEST_PAYMENT_CC_URL', 'https://ppp-test.safecharge.com/ppp/api/v1/paymentCC.do');
 }
 
+// Settle the Order
+define('SC_LIVE_SETTLE_URL', 'https://secure.safecharge.com/ppp/api/v1/settleTransaction.do');
+if(strpos(@$_SERVER['HTTP_HOST'], 'gw-4u.com') !== false || strpos(@$_SERVER['HTTP_HOST'], 'wordpress.mdev') !== false) {
+    define('SC_TEST_SETTLE_URL', 'https://192.168.103.237/ppp/settleTransaction.do');
+//    define('SC_TEST_PAYMENT_CC_URL', 'https://apmtest.gate2shop.com/ppp/settleTransaction.do');
+}
+else {
+    define('SC_TEST_SETTLE_URL', 'https://ppp-test.safecharge.com/ppp/api/v1/settleTransaction.do');
+}
+
 // user CPanel URLs
 define('SC_LIVE_CPANEL_URL', 'cpanel.safecharge.com');
 define('SC_TEST_CPANEL_URL', 'sandbox.safecharge.com');

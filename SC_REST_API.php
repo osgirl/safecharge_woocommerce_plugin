@@ -190,8 +190,6 @@ class SC_REST_API
                 $data,
                 $data['checksum']
             );
-            
-            
         }
         catch (Exception $e) {
             self::create_log($e->getMessage(), 'Exception ERROR when call REST API: ');
@@ -259,6 +257,20 @@ class SC_REST_API
         self::return_response(array('status' => 1, 'msg' => ''), $is_ajax);
     }
     
+    /**
+     * function settle_order
+     * Settle order via Settle button.
+     * If the Settle is success we have to change the status of the Order to Completed.
+     * Use return_response() instead check $is_ajax each time.
+     * 
+     * @param array $data - all data for the void is here, pass it directly
+     * @param bool $is_ajax - is call coming via Ajax
+     */
+    public static function settle_order($data, $is_ajax = false)
+    {
+        return '';
+    }
+
     /**
      * Function call_rest_api
      * Call REST API with cURL post and get response.

@@ -367,6 +367,20 @@ function cancelOrder(question, orderId) {
             });
     }
  }
+ 
+ // when user hit the Settle button
+ function settleOrder(question, orderId) {
+     if(confirm(question)) {
+        jQuery('#custom_loader').show();
+        
+        jQuery.ajax({
+            type: "POST",
+            url: myAjax.ajaxurl,
+            data: { settlelOrder: 1 },
+            dataType: 'json'
+        })
+     }
+ }
 
 /**
  * Function deleteOldestLogs

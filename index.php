@@ -227,16 +227,16 @@ function sc_check_checkout_apm()
 
 function sc_add_buttons()
 {
+    global $wc_sc;
+    
     $order = new WC_Order($_REQUEST['post']);
     $order_status = strtolower($order->get_status());
+    $buttons_html = '';
     
     if($order_status == 'completed') {
         # Data for the VOID
-    //    require_once 'WC_SC.php';
         require_once 'SC_REST_API.php';
         require_once 'SC_Versions_Resolver.php';
-        
-        global $wc_sc;
         
         $sc_api = new SC_REST_API();
         $sc_v_res = new SC_Versions_Resolver();
@@ -279,25 +279,28 @@ function sc_add_buttons()
         $_SESSION['SC_Variables']['checksum'] = $checksum;
         # Data for the VOID END
         
-        $buttons_html = 
+        $buttons_html .= 
             ' <button type="button" onclick="cancelOrder(\''
             . __( 'Are you sure, you want to Cancel Order #'. $_REQUEST['post'] .'?', 'sc' ) .'\', '
             . $_REQUEST['post'] .')" class="button generate-items">'. __( 'Void', 'sc' ) .'</button>';
         
-        // show Settle button ONLY if setting transaction_type IS Auth AND P3D resonse transaction_type IS Auth
-        if(
-            $wc_sc->settings['transaction_type'] == 'Auth'
-            && $order->get_meta(SC_GW_P3D_RESP_TR_TYPE) == 'Auth'
-        ) {
-            $buttons_html .=
-                ' <button type="button" onclick="alert(\'no action for the moment.\')" class="button generate-items">'. __( 'Settle', 'sc' ) .'</button>';
-        }
-        
         $buttons_html .=
             '<div id="custom_loader" class="blockUI blockOverlay"></div>';
-        
-        echo $buttons_html;
     }
+    
+    if(
+        $order_status == 'pending'
+        && $order->get_meta(SC_GW_P3D_RESP_TR_TYPE) == 'Auth'
+        && $wc_sc->settings['transaction_type'] == 'Auth'
+    ) {
+        // show Settle button ONLY if setting transaction_type IS Auth AND P3D resonse transaction_type IS Auth
+        $buttons_html .=
+            ' <button type="button" onclick="settleOrder(\''
+            . __( 'Are you sure, you want to Settle this Order #'. $_REQUEST['post'] .'?', 'sc' ) .'\', '
+            . $_REQUEST['post'] . ')" class="button generate-items">'. __( 'Settle', 'sc' ) .'</button>';
+    }
+    
+    echo $buttons_html;
 }
 
 /**
