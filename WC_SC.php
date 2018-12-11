@@ -110,8 +110,6 @@ class WC_SC extends WC_Payment_Gateway
         
 		add_action('woocommerce_checkout_process', array($this, 'sc_checkout_process'));
 		add_action('woocommerce_receipt_'.$this->id, array($this, 'receipt_page'));
-	//	add_action('woocommerce_api_wc_gateway_sc', array($this, 'process_sc_notification'));
-	//	add_action('woocommerce_api_wc_sc_rest', array($this, 'process_sc_notification'));
 		add_action('woocommerce_api_sc_listener', array($this, 'process_sc_notification'));
 	}
 
@@ -179,8 +177,8 @@ class WC_SC extends WC_Payment_Gateway
                 'type' => 'select',
                 'description' => __('Select preferred Transaction Type.', 'sc'),
                 'options' => array(
-                    'a&s' => 'Auth and Settle',
-                    'sale' => 'Sale',
+                    'Auth' => 'Auth and Settle',
+                    'Sale' => 'Sale',
                 )
             ),
             'test' => array(
@@ -205,7 +203,7 @@ class WC_SC extends WC_Payment_Gateway
             'use_wpml_thanks_page' => array(
                 'title' => __('Use WPML "Thank you" page.', 'sc'),
                 'type' => 'checkbox',
-                'label' => __('Works only if you have installed and configured WPML plugin.', 'sc'),
+                'label' => __('Works only if you have installed and configured WPML plugin. Please, use it careful, this option can brake your "Thank you" page and DMN recieve page!', 'sc'),
                 'default' => 'no'
             ),
             'show_thanks_msg' => array(
@@ -424,7 +422,6 @@ class WC_SC extends WC_Payment_Gateway
 		$params['pending_url']          = $this->get_return_url();
 		$params['error_url']            = $this->get_return_url();
 		$params['back_url']             = $payment_page;
-	//	$params['notify_url']           = $notify_url . 'WC_Gateway_SC';
 		$params['notify_url']           = $notify_url . 'sc_listener';
 		$params['invoice_id']           = $order_id.'_'.$TimeStamp;
 		$params['merchant_unique_id']   = $order_id.'_'.$TimeStamp;
@@ -584,7 +581,6 @@ class WC_SC extends WC_Payment_Gateway
                 'successUrl'        => $this->get_return_url(),
                 'failureUrl'        => $this->get_return_url(),
                 'pendingUrl'        => $this->get_return_url(),
-            //    'notificationUrl'   => $notify_url . 'WC_SC_Rest',
                 'notificationUrl'   => $notify_url . 'sc_listener',
             );
                 
@@ -678,23 +674,11 @@ class WC_SC extends WC_Payment_Gateway
                 // for the three cases see: https://www.safecharge.com/docs/API/?json#dynamic3D,
                 // Possible Scenarios for Dynamic 3D (isDynamic3D = 1)
                 
-                unset($_SESSION['SC_P3D_Params']);
-                
-//                echo '<pre>'.print_r($params,true).'</pre>';
-//                echo '<pre>'.print_r($resp,true).'</pre>';
-//                echo '<pre>'.print_r($_SESSION,true).'</pre>';
+                if(isset($_SESSION['SC_P3D_Params'])) {
+                    unset($_SESSION['SC_P3D_Params']);
+                }
                 
                 if($payment_method == 'd3d') {
-                    /*
-                    $params['transactionType']  = $_SESSION['SC_Variables']['transactionType'];
-                    $params['orderId']          = $resp['orderId'];
-                    $params['paResponse']       = '';
-                    $params['urlDetails']       = array('notificationUrl' => $params['urlDetails']);
-                    $params['sessionToken']     = $resp['sessionToken'];
-                    $params['p3d_url']          = $_SESSION['SC_Variables']['test'] == 'yes'
-                        ? SC_TEST_P3D_URL : SC_LIVE_P3D_URL;
-                     */
-                    
                     $params_p3d = array(
                         'sessionToken'      => $resp['sessionToken'],
                         'orderId'           => $resp['orderId'],
@@ -707,7 +691,7 @@ class WC_SC extends WC_Payment_Gateway
                         'currency'          => $params['currency'],
                         'amount'            => $params['total_amount'],
                         'amountDetails'     => array(
-                            'totalShipping'     => '',
+                            'totalShipping'     => '0.00',
                             'totalHandling'     => $params['handling'],
                             'totalDiscount'     => $params['discount'],
                             'totalTax'          => $params['total_tax'],
@@ -749,8 +733,6 @@ class WC_SC extends WC_Payment_Gateway
                         'checksum'          => $params['checksum'],
                     );
                     
-                //    die('die');
-                    
                     $_SESSION['SC_P3D_Params'] = $params_p3d;
                     
                     // case 1
@@ -758,14 +740,15 @@ class WC_SC extends WC_Payment_Gateway
                         isset($resp['acsUrl']) && !empty($resp['acsUrl'])
                         && isset($resp['threeDFlow']) && intval($resp['threeDFlow']) == 1
                     ) {
-                        $this->create_log($_SESSION['SC_P3D_Params'], '$_SESSION SC_P3D_Params 1: ');
+                        
+                        $this->create_log('', 'D3D case 1.');
                         
                         // step 1 - go to acsUrl
                         $html =
                             '<form action="'. $resp['acsUrl'] .'" method="post" id="sc_payment_form">'
                                 .'<input type="hidden" name="PaReq" value="'. @$resp['paRequest'] .'">'
                                 .'<input type="hidden" name="TermUrl" value="'
-                                //    .$params['pending_url'] .'?wc-api=WC_SC_Rest&action=p3d">'
+                                //    .$params['success_url'] .'?Status=waiting">'
                                     .$params['pending_url'] .'?wc-api=sc_listener&action=p3d">'
                                 .'<noscript>'
                                     .'<input type="submit" class="button-alt" id="submit_sc_payment_form" value="'
@@ -781,10 +764,13 @@ class WC_SC extends WC_Payment_Gateway
                                 .'</script>'
                             .'</form>';
                         
+                        echo $html;
+                        
                         // step 2 - wait for the DMN
                     }
                     // case 2
                     elseif(isset($resp['threeDFlow']) && intval($resp['threeDFlow']) == 1) {
+                        $this->create_log('', 'D3D case 2.');
                         $this->pay_with_d3d_p3d();
                     }
                     // case 3 do nothing
@@ -847,12 +833,36 @@ class WC_SC extends WC_Payment_Gateway
      */
     public function pay_with_d3d_p3d()
     {
-        $this->create_log(@$_SESSION['SC_P3D_Params'], 'Data for pay_with_d3d_p3d(): ');
-        
         $p3d_resp = false;
-        $order = new WC_Order(@$_SESSION['SC_P3D_Params']['clientUniqueId']);
         
-        if(!$order) {
+        try {
+            $order = new WC_Order(@$_SESSION['SC_P3D_Params']['clientUniqueId']);
+
+            if(!$order) {
+                echo 
+                    '<script>'
+                        .'window.location.href = "'.$this->get_return_url().'?Status=fail";'
+                    .'</script>';
+                exit;
+            }
+
+            // some corrections
+            $_SESSION['SC_P3D_Params']['transactionType'] = $this->transaction_type;
+            $_SESSION['SC_P3D_Params']['urlDetails']['notificationUrl'] = $_SESSION['SC_P3D_Params']['urlDetails']['notificationUrl']['notificationUrl'];
+
+            $this->create_log('', 'pay_with_d3d_p3d call to the REST API.');
+
+            require_once 'SC_REST_API.php';
+
+            $p3d_resp = SC_REST_API::call_rest_api(
+                @$_SESSION['SC_Variables']['test'] == 'yes' ? SC_TEST_P3D_URL : SC_LIVE_P3D_URL
+                ,@$_SESSION['SC_P3D_Params']
+                ,$_SESSION['SC_P3D_Params']['checksum']
+            );
+        }
+        catch (Exception $e) {
+            $this->create_log($e->getMessage(), 'pay_with_d3d_p3d Exception: ');
+            
             echo 
                 '<script>'
                     .'window.location.href = "'.$this->get_return_url().'?Status=fail";'
@@ -860,21 +870,12 @@ class WC_SC extends WC_Payment_Gateway
             exit;
         }
         
-        // call refund method
-        require_once 'SC_REST_API.php';
-        
-        $p3d_resp = SC_REST_API::call_rest_api(
-            @$_SESSION['SC_Variables']['test'] == 'yes' ? SC_TEST_P3D_URL : SC_LIVE_P3D_URL
-            ,@$_SESSION['SC_P3D_Params']
-            ,$_SESSION['SC_P3D_Params']['checksum']
-        );
-        
-        if(!$resp) {
+        if(!$p3d_resp) {
             if($order_status == 'pending') {
                 $order->set_status('failed');
             }
 
-            $order->add_order_note(__('Payment 3D API response is FALSE.', 'sc'));
+            $order->add_order_note(__('Payment 3D API response fails.', 'sc'));
             $order->save();
 
             $this->create_log($resp, 'REST API Payment 3D ERROR: ');
@@ -886,7 +887,23 @@ class WC_SC extends WC_Payment_Gateway
             exit;
         }
         
+        // save the response type of transaction
+        if(isset($p3d_resp['transactionType']) && $p3d_resp['transactionType'] != '') {
+            $order->update_meta_data(SC_GW_P3D_RESP_TR_TYPE, $p3d_resp['transactionType']);
+        }
         
+        $this->change_order_status(
+            $order,
+            $_SESSION['SC_P3D_Params']['clientUniqueId'],
+            @$p3d_resp['status'],
+            $this->transaction_type
+        );
+        
+        echo 
+            '<script>'
+                .'window.location.href = "'. $this->get_return_url() .'?Status=wait";'
+            .'</script>';
+        exit;
     }
     
 	/**
@@ -1148,19 +1165,16 @@ class WC_SC extends WC_Payment_Gateway
         # D3D and P3D payment
         // the idea here is to get $_REQUEST['paResponse'] and pass it to P3D
         elseif(@$_REQUEST['action'] == 'p3d') {
-            $this->create_log($_REQUEST, 'DMN from issuer/bank: ');
-
             // the DMN from step 1 - issuer/bank
             if(
-                isset($_SESSION['SC_P3D_Params'], $_REQUEST['paResponse'])
-                && !is_array($_SESSION['SC_P3D_Params'])
+                isset($_SESSION['SC_P3D_Params'], $_REQUEST['PaRes'])
+                && is_array($_SESSION['SC_P3D_Params'])
             ) {
-                $_SESSION['SC_P3D_Params']['paResponse'] = $_REQUEST['paResponse'];
+                $_SESSION['SC_P3D_Params']['paResponse'] = $_REQUEST['PaRes'];
                 $this->pay_with_d3d_p3d();
             }
             // the DMN form step 2 - p3d
             elseif(isset($_REQUEST['merchantId'], $_REQUEST['merchantSiteId'])) {
-                // TODO
                 // here we must unset $_SESSION['SC_P3D_Params'] as last step
                 try {
                     $order = new WC_Order(@$_REQUEST['clientUniqueId']);
@@ -1178,6 +1192,10 @@ class WC_SC extends WC_Payment_Gateway
                         'process_dmns() REST API DMN DMN Exception: '
                     );
                 }
+            }
+            
+            if(isset($_SESSION['SC_P3D_Params'])) {
+                unset($_SESSION['SC_P3D_Params']);
             }
             
             echo 'DMN received.';
@@ -1555,19 +1573,28 @@ class WC_SC extends WC_Payment_Gateway
      * @param int $order_id
      * @param string $status
      * @param string $transactionType - not mandatory for the DMN
+     * @param array $res_args - we must use $res_args instead $_REQUEST, if not empty
      */
-    private function change_order_status($order, $order_id, $status, $transactionType = '')
+    private function change_order_status($order, $order_id, $status, $transactionType = '', $res_args = array())
     {
-        $this->create_log($status . ' - ' . $order_id, 'WC_SC change_order_status() status-order: ');
+        $this->create_log(
+            'Order ' . $order_id .' has Status: ' . $status,
+            'WC_SC change_order_status() status-order: '
+        );
+        
+        $request = @$_REQUEST;
+        if(!empty($res_args)) {
+            $request = $res_args;
+        }
         
         global $woocommerce;
         
         switch($status) {
             case 'CANCELED':
                 $message = 'Payment status changed to:' . $status
-                    .'. PPP_TransactionID = '. @$_REQUEST['PPP_TransactionID']
+                    .'. PPP_TransactionID = '. @$request['PPP_TransactionID']
                     .", Status = " .$status. ', GW_TransactionID = '
-                    .@$_REQUEST['TransactionID'];
+                    .@$request['TransactionID'];
 
                 $this->msg['message'] = $message;
                 $this->msg['class'] = 'woocommerce_message';
@@ -1579,13 +1606,13 @@ class WC_SC extends WC_Payment_Gateway
             case 'APPROVED':
                 $message = 'The amount has been authorized and captured by '
                     .SC_GATEWAY_TITLE .'. PPP_TransactionID = '
-                    .@$_REQUEST['PPP_TransactionID'] .", Status = ". $status;
+                    .@$request['PPP_TransactionID'] .", Status = ". $status;
 
                 if($transactionType) {
                     $message .= ", TransactionType = ". $transactionType;
                 }
 
-                $message .= ', GW_TransactionID = '. @$_REQUEST['TransactionID'];
+                $message .= ', GW_TransactionID = '. @$request['TransactionID'];
 
                 $this->msg['message'] = $message;
                 $this->msg['class'] = 'woocommerce_message';
@@ -1594,7 +1621,7 @@ class WC_SC extends WC_Payment_Gateway
                 $order->update_status( 'completed' );
                 
                 $order->add_order_note(SC_GATEWAY_TITLE .' payment is successful<br/>Unique Id: '
-                    .@$_REQUEST['PPP_TransactionID']);
+                    .@$request['PPP_TransactionID']);
 
                 $order->add_order_note($this->msg['message']);
                 $woocommerce->cart->empty_cart();
@@ -1602,15 +1629,16 @@ class WC_SC extends WC_Payment_Gateway
 
             case 'ERROR':
             case 'DECLINED':
-                $message ='Payment failed. PPP_TransactionID = '. @$_REQUEST['PPP_TransactionID']
-                    .", Status = ". $status .", Error code = ". @$_REQUEST['ErrCode']
-                    .", Message = ". @$_REQUEST['message'];
+                $message ='Payment failed. PPP_TransactionID = '. @$request['PPP_TransactionID']
+                    .", Status = ". $status .", Error code = ". @$request['ErrCode']
+                    .", Message = ". @$request['message']
+                    .", Reason = ". @$request['reason'];
 
                 if($transactionType) {
                     $message .= ", TransactionType = ". $transactionType;
                 }
 
-                $message .= ', GW_TransactionID = '. $_REQUEST['TransactionID'];
+                $message .= ', GW_TransactionID = '. @$request['TransactionID'];
 
                 $this->msg['message'] = $message;
                 $this->msg['class'] = 'woocommerce_message';
@@ -1626,18 +1654,18 @@ class WC_SC extends WC_Payment_Gateway
                 }
 
                 $message ='Payment is still pending, PPP_TransactionID '
-                    .@$_REQUEST['PPP_TransactionID'] .", Status = ". $status;
+                    .@$request['PPP_TransactionID'] .", Status = ". $status;
 
                 if($transactionType) {
                     $message .= ", TransactionType = ". $transactionType;
                 }
 
-                $message .= ', GW_TransactionID = '. @$_REQUEST['TransactionID'];
+                $message .= ', GW_TransactionID = '. @$request['TransactionID'];
 
                 $this->msg['message'] = $message;
                 $this->msg['class'] = 'woocommerce_message woocommerce_message_info';
                 $order->add_order_note(SC_GATEWAY_TITLE .' payment status is pending<br/>Unique Id: '
-                    .@$_REQUEST['PPP_TransactionID']);
+                    .@$request['PPP_TransactionID']);
 
                 $order->add_order_note($this->msg['message']);
                 $order->update_status('on-hold');
@@ -1712,7 +1740,7 @@ class WC_SC extends WC_Payment_Gateway
         $saved_tr_id = $order->get_meta(SC_GW_TRANS_ID_KEY);
 
         if(!$saved_tr_id || empty($saved_tr_id) || $saved_tr_id !== $gw_transaction_id) {
-            $order->update_meta_data(SC_GW_TRANS_ID_KEY, $gw_transaction_id, 0);
+            $order->update_meta_data(SC_GW_TRANS_ID_KEY, $gw_transaction_id);
         }
 
         $order->save();

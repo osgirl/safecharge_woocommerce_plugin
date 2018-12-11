@@ -284,7 +284,11 @@ function sc_add_buttons()
             . __( 'Are you sure, you want to Cancel Order #'. $_REQUEST['post'] .'?', 'sc' ) .'\', '
             . $_REQUEST['post'] .')" class="button generate-items">'. __( 'Void', 'sc' ) .'</button>';
         
-        if($wc_sc->settings['transaction_type'] == 'a&s') {
+        // show Settle button ONLY if setting transaction_type IS Auth AND P3D resonse transaction_type IS Auth
+        if(
+            $wc_sc->settings['transaction_type'] == 'Auth'
+            && $order->get_meta(SC_GW_P3D_RESP_TR_TYPE) == 'Auth'
+        ) {
             $buttons_html .=
                 ' <button type="button" onclick="alert(\'no action for the moment.\')" class="button generate-items">'. __( 'Settle', 'sc' ) .'</button>';
         }

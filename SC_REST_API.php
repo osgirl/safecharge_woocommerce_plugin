@@ -285,9 +285,11 @@ class SC_REST_API
         }
         
         // get them only if we pass them empty
-        if(isset($params['deviceDetails']) && empty($params['deviceDetails'])) {
+        if(isset($params['deviceDetails'])) {
             $params['deviceDetails'] = self::get_device_details();
         }
+        
+        self::create_log($params, 'SC_REST_API, parameters for the REST API call: ');
         
         $json_post = json_encode($params);
         self::create_log($json_post, 'params as json: ');
@@ -312,8 +314,8 @@ class SC_REST_API
             $resp = curl_exec($ch);
             curl_close ($ch);
             
-            self::create_log($url, 'Call rest api URL: ');
-            self::create_log($resp, 'Call rest api response: ');
+            self::create_log($url, 'REST API URL: ');
+            self::create_log($resp, 'REST API response: ');
         }
         catch(Exception $e) {
             self::create_log($e->getMessage(), 'Exception ERROR when call REST API: ');
