@@ -72,6 +72,13 @@ if(
         exit;
     }
     
+    // when merchant settle the order via Settle button
+    if(isset($_POST['settleOrder']) && $_POST['settleOrder'] == 1) {
+        SC_REST_API::void_and_settle_order($_SESSION['SC_Variables'], 'settle', true);
+        unset($_SESSION['SC_Variables']);
+        exit;
+    }
+    
     if($_SESSION['SC_Variables']['payment_api'] == 'rest') {
         // when we want Session Token
         if(isset($_POST['needST']) && $_POST['needST'] == 1) {
@@ -85,11 +92,6 @@ if(
             }
 
             SC_REST_API::get_rest_apms($_SESSION['SC_Variables'], true);
-        }
-        // when merchant settle the order via Settle button
-        elseif(isset($_POST['settleOrder']) && $_POST['settleOrder'] == 1) {
-            SC_REST_API::void_and_settle_order($_SESSION['SC_Variables'], 'settle', true);
-            unset($_SESSION['SC_Variables']);
         }
         
         exit;

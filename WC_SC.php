@@ -968,6 +968,7 @@ class WC_SC extends WC_Payment_Gateway
         # Cashier sale, the invoice_id parameter has value
         if(
             isset($_REQUEST['transactionType'], $_REQUEST['invoice_id'])
+            && $_REQUEST['transactionType'] != 'Credit'
             && !empty($_REQUEST['invoice_id'])
             && $this->checkAdvancedCheckSum()
         ) {
@@ -1043,12 +1044,7 @@ class WC_SC extends WC_Payment_Gateway
                 && $req_status == 'APPROVED'
                 && @$_REQUEST['transactionType'] == 'Credit'
             ) {
-                $this->create_log('', 'CPanel Refund DMN');
-                
                 $order_id = @current(explode('_', $_REQUEST['invoice_id']));
-                
-                $this->create_log($order_id, 'CPanel Refund DMN $order_id ');
-                
                 $order = new WC_Order($order_id);
                 $resp = $this->sc_refund_order($order_id);
                 
@@ -1529,10 +1525,6 @@ class WC_SC extends WC_Payment_Gateway
         //    'line_items'     => $items,
             'refund_payment' => false,
         ));
-        
-        $this->create_log($refund_amount, 'Refund amount: ');
-        $this->create_log($order_id, 'Refund $order_id: ');
-        $this->create_log($items, 'Refund $items: ');
         
         return $refund;
     }
