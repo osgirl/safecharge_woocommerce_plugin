@@ -68,9 +68,7 @@ class WC_SC extends WC_Payment_Gateway
         $_SESSION['SC_Variables']['save_logs']          = $this->save_logs;
         $_SESSION['SC_Variables']['rewrite_dmn']        = $this->rewrite_dmn;
         
-        $client = new WC_Customer();
         $_SESSION['SC_Variables']['sc_country'] = SC_Versions_Resolver::get_client_country(new WC_Customer);
-    //    $_SESSION['SC_Variables']['sc_country'] = $client->get_billing_country();
         if(isset($_POST["billing_country"]) && !empty($_POST["billing_country"])) {
             $_SESSION['SC_Variables']['sc_country'] = $_POST["billing_country"];
         }
@@ -389,7 +387,6 @@ class WC_SC extends WC_Payment_Gateway
         $params['numberofitems'] = $i-1;
         
         $params['handling'] = SC_Versions_Resolver::get_shipping($order);
-    //    $params['handling'] = $order->get_shipping_total();
         $params['discount'] = number_format($order->get_discount_total(), 2, '.', '');
         
 		if ($params['handling'] < 0) {

@@ -3,9 +3,9 @@
 Plugin Name: SafeCharge WooCommerce PlugIn
 Plugin URI: http://www.safecharge.com
 Description: SafeCharge gateway for woocommerce
-Version: 1.7
+Version: 1.8.1
 Author: SafeCharge
-Author URI:http://safecharge.com
+Author URI: http://safecharge.com
 */
 
 if(!defined('ABSPATH')) {
@@ -34,13 +34,13 @@ function woocommerce_sc_init()
     
     add_filter('woocommerce_payment_gateways', 'woocommerce_add_sc_gateway' );
 	add_action('init', 'sc_enqueue'); // need WC_SC
-	add_action('woocommerce_thankyou_order_received_text', 'sc_show_final_text'); // need WC_SC
+	add_action('woocommerce_thankyou_order_received_text', 'sc_show_final_text');
     // Check checkout for selected apm ONLY when payment api is REST
     add_action( 'woocommerce_checkout_process', 'sc_check_checkout_apm', 20 );
     // add void and/or settle buttons to completed orders
-    add_action( 'woocommerce_order_item_add_action_buttons', 'sc_add_buttons'); // need WC_SC
+    add_action( 'woocommerce_order_item_add_action_buttons', 'sc_add_buttons');
     // Refun hook, when create refund from WC, we do not want this to be activeted from DMN
-    add_action('woocommerce_create_refund', 'sc_create_refund'); // need WC_SC
+    add_action('woocommerce_create_refund', 'sc_create_refund');
     
     // for WPML plugin
     if(
@@ -161,16 +161,21 @@ function sc_create_refund()
 {
     if(!isset($_REQUEST['wc-api'])) {
         // get GW so we can use its settings
-        require_once 'WC_SC.php';
         global $wc_sc;
 
         $notify_url = $wc_sc->set_notify_url();
 
         // get order refunds
-        if(isset($_REQUEST['order_id'])) {
-            $order = new WC_Order( (int)$_REQUEST['order_id'] );
-            $refunds = $order->get_refunds();
-
+        if(isset($_REQUEST['order_id']) && $_REQUEST['order_id'] != '') {
+            try {
+                $order = new WC_Order( (int)$_REQUEST['order_id'] );
+                $refunds = $order->get_refunds();
+            }
+            catch (Exception $ex) {
+                create_log($ex->getMessage(), 'sc_create_refund() Exception: ');
+                wp_send_json_success();
+            }
+            
             if(!$refunds || !isset($refunds[0]) || !is_array($refunds[0]->data)) {
                 $order -> add_order_note(__('There are no refunds data. If refund was made, delete it manually!', 'sc'));
                 $order->save();
@@ -198,10 +203,6 @@ function sc_create_refund()
 
             create_log($resp, 'Refund response from sc_create_refund(): ');
 
-    //        if(!empty($resp['new_order_status'])) {
-    //            $order->set_status($resp['new_order_status']);
-    //        }
-
             $order->save();
             wp_send_json_success();
         }
@@ -223,8 +224,6 @@ function sc_check_checkout_apm()
 
 function sc_add_buttons()
 {
-    global $wc_sc;
-
     try {
         $order = new WC_Order($_REQUEST['post']);
         $order_status = strtolower($order->get_status());
@@ -237,6 +236,7 @@ function sc_add_buttons()
     
     if($order_status == 'completed'|| $order_status == 'pending') {
         require_once 'SC_Versions_Resolver.php';
+        global $wc_sc;
 
         $time = date('YmdHis', time());
         $order_tr_id = $order->get_meta(SC_GW_TRANS_ID_KEY);
@@ -317,16 +317,13 @@ function sc_add_buttons()
  */
 function sc_rewrite_return_url()
 {
-    global $wc_sc;
-    $new_url = '';
-    $host = '';
-    
     if(
         isset($_REQUEST['ppp_status']) && $_REQUEST['ppp_status'] != ''
         && (!isset($_REQUEST['wc_sc_redirected']) || $_REQUEST['wc_sc_redirected'] == 0)
     ) {
-    //    $host = $wc_sc->get_return_url();
-        $host = (strpos($_SERVER["SERVER_PROTOCOL"], 'HTTP/') !== false ? 'http' : 'https') . '://' . $_SERVER['HTTP_HOST'] . current(explode('?', $_SERVER['REQUEST_URI']));
+        $new_url = '';
+        $host = (strpos($_SERVER["SERVER_PROTOCOL"], 'HTTP/') !== false ? 'http' : 'https')
+            . '://' . $_SERVER['HTTP_HOST'] . current(explode('?', $_SERVER['REQUEST_URI']));
         
         if(isset($_SERVER['QUERY_STRING']) && $_SERVER['QUERY_STRING'] != '') {
             $new_url = preg_replace('/\+|\s|\%20/', '_', $_SERVER['QUERY_STRING']);

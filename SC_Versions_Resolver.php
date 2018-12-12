@@ -1,6 +1,7 @@
 <?php
 /* 
- * A try to get what we need when work with different versions of WooCommers
+ * A try to get what we need when work with different versions of WooCommers.
+ * For the moment the plugin lowest support version is 3.0.0
  * 
  * SafeCharge
  * 2018-08
