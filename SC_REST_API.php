@@ -266,11 +266,14 @@ class SC_REST_API
      * @param array $data - all data for the void is here, pass it directly
      * @param string $action - void or settle
      * @param bool $is_ajax - is call coming via Ajax
+     * 
+     * TODO we must test the case when we call this method from another, NOT via Ajax
      */
     public static function void_and_settle_order($data, $action, $is_ajax = false)
     {
-        self::create_log($data, 'Input parameters for void_and_settle_order: ');
+        self::create_log('', 'void_and_settle_order() - ' . $action . ': ');
         $resp = false;
+        $status = 1;
         
         try {
             if($action == 'settle') {
@@ -285,71 +288,29 @@ class SC_REST_API
         }
         catch (Exception $e) {
             self::create_log($e->getMessage(), $action . ' order Exception ERROR when call REST API: ');
-            
             self::return_response(
-                array(
-                    'status' => 0,
-                    'msg' => 'Exception ERROR when call REST API.'
-                ),
-                $is_ajax
+                array('status' => 0, 'data' => $e->getMessage()),
+                is_ajax
             );
+            exit;
         }
         
-        $this->create_log($resp, 'SC_REST_API void_and_settle_order() full response: ');
+        self::create_log($resp, 'SC_REST_API void_and_settle_order() full response: ');
         
-        if(!$resp) {
-            self::return_response(
-                array(
-                    'status' => 0,
-                    'msg' => 'API response ERROR.',
-                ),
-                $resp,
-                $is_ajax
-            );
+        if(
+            !$resp || !is_array($resp)
+            || @$resp['status'] == 'ERROR'
+            || @$resp['transactionStatus'] == 'ERROR'
+            || @$resp['transactionStatus'] == 'DECLINED'
+        ) {
+            $status = 0;
         }
         
-        if(!is_array($resp)) {
-            self::return_response(
-                array(
-                    'status' => 0,
-                    'msg' => 'API response ERROR - unexpected response format, the response is not array.'
-                ),
-                $is_ajax
-            );
-        }
-        
-        if($resp['status'] == 'ERROR') {
-            self::return_response(
-                array(
-                    'status' => 0,
-                    'msg' => 'API call returns status ERROR: ' . $resp['reason']
-                ),
-                $is_ajax
-            );
-        }
-        
-        if(@$resp['transactionStatus'] == 'ERROR') {
-            self::return_response(
-                array(
-                    'status' => 0,
-                    'msg' => 'Transaction ERROR: ' . $resp['gwErrorReason']
-                ),
-                $is_ajax
-            );
-        }
-        
-        if(@$resp['transactionStatus'] == 'DECLINED') {
-            self::return_response(
-                array(
-                    'status' => 0,
-                    'msg' => 'Canceling order was DECLINED: ' . $resp['gwErrorReason']
-                ),
-                $is_ajax
-            );
-        }
-        
-        // the Cancel proccess was Approved, change the status of the Order
-        self::return_response(array('status' => 1, 'msg' => ''), $is_ajax);
+        self::return_response(
+            array('status' => $status, 'data' => $resp),
+            is_ajax
+        );
+        exit;
     }
 
     /**

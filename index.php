@@ -78,13 +78,8 @@ function sc_enqueue($hook)
     # load external files
     $plugin_dir = basename(dirname(__FILE__));
    
-    // main JS, use min on production
-    if(!defined('WP_DEBUG') || WP_DEBUG === false) {
-        wp_register_script("sc_js_script", WP_PLUGIN_URL . '/' . $plugin_dir . '/js/sc.min.js', array('jquery') );
-    }
-    else {
-        wp_register_script("sc_js_script", WP_PLUGIN_URL . '/' . $plugin_dir . '/js/sc.js', array('jquery') );
-    }
+    // main JS
+    wp_register_script("sc_js_script", WP_PLUGIN_URL . '/' . $plugin_dir . '/js/sc.js', array('jquery') );
     
     wp_localize_script(
         'sc_js_script',
@@ -94,6 +89,7 @@ function sc_enqueue($hook)
         )
     );  
     wp_enqueue_script( 'sc_js_script' );
+    // main JS END
     
     // novo style
     wp_register_style ('novo_style', WP_PLUGIN_URL. '/'. $plugin_dir. '/css/novo.css', '' , '', 'all' );
@@ -227,89 +223,89 @@ function sc_check_checkout_apm()
 
 function sc_add_buttons()
 {
-//    require_once 'SC_REST_API.php';
-    require_once 'SC_Versions_Resolver.php';
-    
     global $wc_sc;
-    
-    $order = new WC_Order($_REQUEST['post']);
-    $order_status = strtolower($order->get_status());
-//    $sc_api = new SC_REST_API();
-    $sc_v_res = new SC_Versions_Resolver();
-    $time = date('YmdHis', time());
-    $order_tr_id = $order->get_meta(SC_GW_TRANS_ID_KEY);
-    $notify_url = $wc_sc->set_notify_url();
-    $buttons_html = '';
-    
-    // common data
-    $_SESSION['SC_Variables'] = array(
-        'merchantId'            => $wc_sc->settings['merchantId'],
-        'merchantSiteId'        => $wc_sc->settings['merchantSiteId'],
-        'clientRequestId'       => $time . '_' . $order_tr_id,
-        'clientUniqueId'        => $order_tr_id,
-        'amount'                => $sc_v_res->get_order_data($order, 'order_total'),
-    //    'amount'                => $wc_sc->get_order_data($order, 'order_total'),
-        'currency'              => get_woocommerce_currency(),
-        'relatedTransactionId'  => $order_tr_id,
-        'authCode'              => $order->get_meta(SC_AUTH_CODE_KEY),
-        'timeStamp'             => $time,
-        // optional fields for sc_ajax.php
-        'test'                  => $wc_sc->settings['test'],
-        'payment_api'           => 'rest',
-        'save_logs'             => $wc_sc->settings['save_logs'],
-    );
-    
-    // VOID
-    if($order_status == 'completed') {
-        $_SESSION['SC_Variables']['urlDetails']['notificationUrl'] =
-            $notify_url . 'sc_listener&action=void&clientRequestId=' . $_REQUEST['post'];
-        
-        $buttons_html .= 
-            ' <button type="button" onclick="settleAndCancelOrder(\''
-            . __( 'Are you sure, you want to Cancel Order #'. $_REQUEST['post'] .'?', 'sc' ) .'\', '
-            . '\'void\', ' . $_REQUEST['post'] .')" class="button generate-items">'
-            . __( 'Void', 'sc' ) .'</button>';
-        
-        $buttons_html .=
-            '<div id="custom_loader" class="blockUI blockOverlay"></div>';
-    }
-    // SETTLE
-    elseif(
-        $order_status == 'pending'
-        && $order->get_meta(SC_GW_P3D_RESP_TR_TYPE) == 'Auth'
-        && $wc_sc->settings['transaction_type'] == 'Auth'
-    ) {
-        $_SESSION['SC_Variables']['urlDetails']['notificationUrl'] =
-            $notify_url . 'sc_listener&action=settle&clientRequestId=' . $_REQUEST['post'];
-        
-        // show Settle button ONLY if setting transaction_type IS Auth AND P3D resonse transaction_type IS Auth
-        $buttons_html .=
-            ' <button type="button" onclick="settleAndCancelOrder(\''
-            . __( 'Are you sure, you want to Settle this Order #'. $_REQUEST['post'] .'?', 'sc' ) .'\', '
-            . '\'settle\', ' . $_REQUEST['post'] .')" class="button generate-items">'
-            . __( 'Settle', 'sc' ) .'</button>';
-    }
-    
-    
-    var_dump($order_status);
-    var_dump($order->get_meta(SC_GW_P3D_RESP_TR_TYPE));
-    var_dump($wc_sc->settings['transaction_type']);
-    
-    var_dump($_SESSION['SC_Variables']);
-    
-    $checksum = hash(
-        $wc_sc->settings['hash_type'],
-        $wc_sc->settings['merchantId'] . $wc_sc->settings['merchantSiteId']
-            .($time . '_' . $order_tr_id) . $order_tr_id . $_SESSION['SC_Variables']['amount']
-            .$_SESSION['SC_Variables']['currency'] . $order_tr_id
-            .$_SESSION['SC_Variables']['authCode']
-            .$_SESSION['SC_Variables']['urlDetails']['notificationUrl']
-            .$time . $wc_sc->settings['secret']
-    );
 
-    $_SESSION['SC_Variables']['checksum'] = $checksum;
+    try {
+        $order = new WC_Order($_REQUEST['post']);
+        $order_status = strtolower($order->get_status());
+    }
+    catch (Exception $ex) {
+        echo '<script type="text/javascript">console.error("'
+            . $ex->getMessage() . '")</script>';
+        exit;
+    }
     
-    echo $buttons_html;
+    if($order_status == 'completed'|| $order_status == 'pending') {
+        require_once 'SC_Versions_Resolver.php';
+
+        $time = date('YmdHis', time());
+        $order_tr_id = $order->get_meta(SC_GW_TRANS_ID_KEY);
+        $notify_url = $wc_sc->set_notify_url();
+        $buttons_html = '';
+
+        // common data
+        $_SESSION['SC_Variables'] = array(
+            'merchantId'            => $wc_sc->settings['merchantId'],
+            'merchantSiteId'        => $wc_sc->settings['merchantSiteId'],
+            'clientRequestId'       => $time . '_' . $order_tr_id,
+            'clientUniqueId'        => $_REQUEST['post'],
+            'amount'                => SC_Versions_Resolver::get_order_data($order, 'order_total'),
+        //    'amount'                => $wc_sc->get_order_data($order, 'order_total'),
+            'currency'              => get_woocommerce_currency(),
+            'relatedTransactionId'  => $order_tr_id,
+            'authCode'              => $order->get_meta(SC_AUTH_CODE_KEY),
+            'timeStamp'             => $time,
+            // optional fields for sc_ajax.php
+            'test'                  => $wc_sc->settings['test'],
+            'payment_api'           => 'rest',
+            'save_logs'             => $wc_sc->settings['save_logs'],
+            'urlDetails'            => array(
+                'notificationUrl'       => $notify_url . 'sc_listener&clientRequestId=' . $_REQUEST['post']
+            ),
+        );
+        
+        // Show VOID button only if the order is completed.
+        if($order_status == 'completed') {
+            $buttons_html .= 
+                ' <button type="button" onclick="settleAndCancelOrder(\''
+                . __( 'Are you sure, you want to Cancel Order #'. $_REQUEST['post'] .'?', 'sc' ) .'\', '
+                . '\'void\', ' . $_REQUEST['post'] .')" class="button generate-items">'
+                . __( 'Void', 'sc' ) .'</button>';
+        }
+        
+        // show SETTLE button ONLY if setting transaction_type IS Auth AND P3D resonse transaction_type IS Auth
+        if(
+            $order_status == 'pending'
+            && $order->get_meta(SC_GW_P3D_RESP_TR_TYPE) == 'Auth'
+            && $wc_sc->settings['transaction_type'] == 'Auth'
+        ) {
+            $buttons_html .=
+                ' <button type="button" onclick="settleAndCancelOrder(\''
+                . __( 'Are you sure, you want to Settle this Order #'. $_REQUEST['post'] .'?', 'sc' ) .'\', '
+                . '\'settle\', ' . $_REQUEST['post'] .')" class="button generate-items">'
+                . __( 'Settle', 'sc' ) .'</button>';
+        }
+
+        $checksum = hash(
+            $wc_sc->settings['hash_type'],
+            $wc_sc->settings['merchantId']
+                . $wc_sc->settings['merchantSiteId']
+                . $_SESSION['SC_Variables']['clientRequestId']
+                . $_SESSION['SC_Variables']['clientUniqueId']
+                . $_SESSION['SC_Variables']['amount']
+                . $_SESSION['SC_Variables']['currency']
+                . $_SESSION['SC_Variables']['relatedTransactionId']
+                . $_SESSION['SC_Variables']['authCode']
+                . $_SESSION['SC_Variables']['urlDetails']['notificationUrl']
+                . $time
+                . $wc_sc->settings['secret']
+        );
+
+        $_SESSION['SC_Variables']['checksum'] = $checksum;
+
+        // add loading screen
+        echo $buttons_html . '<div id="custom_loader" class="blockUI blockOverlay"></div>';
+    }
 }
 
 /**

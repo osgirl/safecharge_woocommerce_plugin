@@ -1004,52 +1004,16 @@ class WC_SC extends WC_Payment_Gateway
             exit;
         }
         
-        # Void 
-        // when we refund form CPanel we get transactionType = Void and Status = 'APPROVED'
+        # Void, Settle
         if(
-            (@$_REQUEST['action'] == 'void' || @$_REQUEST['transactionType'] == 'Void')
-            && !empty(@$_REQUEST['clientRequestId'])
-            && ($req_status == 1 || $req_status == 0 || $req_status == 'APPROVED')
+            $req_status != ''
+            && isset($_REQUEST['clientUniqueId'])
+            && $_REQUEST['clientUniqueId'] != ''
+            && (@$_REQUEST['transactionType'] == 'Void' || @$_REQUEST['transactionType'] == 'Settle')
         ) {
             try {
-                $order = new WC_Order($_REQUEST['clientRequestId']);
-
-                if($order) {
-                    $order_status = strtolower($order->get_status());
-
-                    // change order status to canceld
-                    if(
-                        $this->get_request_status() == 1
-                        && $order_status != 'canceled'
-                        && $order_status != 'cancelled'
-                    ) {
-                        $order->add_order_note(__('DMN message: Your Void request was success, Order #'
-                            .$_REQUEST['clientRequestId'] . ' was canceld.', 'sc'));
-
-                        $order->update_status('cancelled');
-                        $order->save();
-                    }
-                    else {
-                        $msg = 'DMN message: Your Void request fail with message: "';
-
-                        // in case DMN URL was rewrited all spaces were replaces with "_"
-                        if(@$_REQUEST['wc_sc_redirected'] == 1) {
-                            $msg .= str_replace('_', ' ', @$_REQUEST['msg']);
-                        }
-                        else {
-                            $msg .= @$_REQUEST['msg'];
-                        }
-
-                        $msg .= '". Order #'  . $_REQUEST['clientRequestId']
-                            .' was not canceld!';
-
-                        $order -> add_order_note(__($msg, 'sc'));
-                        $order->save();
-                    }
-                }
-                else {
-                    echo 'There is no Order. ';
-                }
+                $order = new WC_Order($_REQUEST['clientUniqueId']);
+                $this->change_order_status($order, $_REQUEST['clientUniqueId'], $req_status, $_REQUEST['transactionType']);
             }
             catch (Exception $ex) {
                 $this->create_log(
@@ -1065,6 +1029,7 @@ class WC_SC extends WC_Payment_Gateway
         # Refund
         // see https://www.safecharge.com/docs/API/?json#refundTransaction -> Output Parameters
         // when we refund form CPanel we get transactionType = Credit and Status = 'APPROVED'
+        // TODO make it with change_order_status()
         if(
             (@$_REQUEST['action'] == 'refund' || @$_REQUEST['transactionType'] == 'Credit')
             && !empty($req_status)
@@ -1604,11 +1569,23 @@ class WC_SC extends WC_Payment_Gateway
             break;
 
             case 'APPROVED':
+                if($transactionType == 'Void') {
+                    $order->add_order_note(__('DMN message: Your Void request was success, Order #'
+                        .$_REQUEST['clientUniqueId'] . ' was canceld.', 'sc'));
+
+                    $order->update_status('cancelled');
+                    $order->save();
+                    break;
+                }
+                
                 $message = 'The amount has been authorized and captured by '
                     . SC_GATEWAY_TITLE . '. ';
                 
                 if($transactionType == 'Auth') {
                     $message = 'The amount has been authorized and wait to for Settle. ';
+                }
+                elseif($transactionType == 'Settle') {
+                    $message = 'The amount has been captured by ' . SC_GATEWAY_TITLE . '. ';
                 }
                 
                 $message .= 'PPP_TransactionID = ' . @$request['PPP_TransactionID']
@@ -1637,6 +1614,25 @@ class WC_SC extends WC_Payment_Gateway
 
             case 'ERROR':
             case 'DECLINED':
+                if($transactionType == 'Void') {
+                    $msg = 'DMN message: Your Void request fail with message: "';
+
+                    // in case DMN URL was rewrited all spaces were replaces with "_"
+                    if(@$_REQUEST['wc_sc_redirected'] == 1) {
+                        $msg .= str_replace('_', ' ', @$_REQUEST['message']);
+                    }
+                    else {
+                        $msg .= @$_REQUEST['msg'];
+                    }
+
+                    $msg .= '". Order #'  . $_REQUEST['clientUniqueId']
+                        .' was not canceld!';
+
+                    $order -> add_order_note(__($msg, 'sc'));
+                    $order->save();
+                    break;
+                }
+                
                 $message ='Payment failed. PPP_TransactionID = '. @$request['PPP_TransactionID']
                     .", Status = ". $status .", Error code = ". @$request['ErrCode']
                     .", Message = ". @$request['message']

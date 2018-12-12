@@ -357,21 +357,16 @@ function settleAndCancelOrder(question, action, orderId) {
             .done(function(resp) {
                 // go to DMN page to change order status
                 if(
-                    typeof resp.status != 'undefined'
+                    resp
+                    && typeof resp.status != 'undefined'
                     && (resp.status == 1 || resp.status == 0)
                 ) {
-                    // call DMN page:
-                    jQuery.ajax({
-                        url: '//' + window.location.host +'/?wc-api=sc_listener&action='
-                            + action+'&Status='  + resp.status +'&clientRequestId='
-                            + orderId +'&msg='+ resp.msg,
-                        dataType: 'text'
-                    })
-                        .complete(function(resp){
-                            jQuery('#custom_loader').hide();
-                            alert('You will be redirected to Orders list.')
-                            window.location = '//' + window.location.host + '/wp-admin/edit.php?post_type=shop_order';
-                        })
+                    jQuery('#custom_loader').hide();
+                    alert('You will be redirected to Orders list.')
+                    window.location = '//' + window.location.host + '/wp-admin/edit.php?post_type=shop_order';
+                }
+                else {
+                    alert('Error with the Response.');
                 }
             });
     }
