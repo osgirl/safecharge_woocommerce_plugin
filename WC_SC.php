@@ -960,44 +960,44 @@ class WC_SC extends WC_Payment_Gateway
         $this->create_log(@$_REQUEST, 'Receive DMN with params: ');
         
         $req_status = $this->get_request_status();
+        if($req_status == '') {
+            echo 'Error: the DMN Status is empty!';
+            exit;
+        }
         
-        # Sale - Cashier and may be REST
-        if(isset($_REQUEST['transactionType']) && $_REQUEST['transactionType'] == 'Sale') {
+        # Cashier sale, the invoice_id parameter has value
+        if(
+            isset($_REQUEST['transactionType'], $_REQUEST['invoice_id'])
+            && !empty($_REQUEST['invoice_id'])
+            && $this->checkAdvancedCheckSum()
+        ) {
+            $this->create_log('', 'Cashier sale.');
+            
             // Cashier
-            if(
-                isset($_REQUEST['invoice_id'])
-                && !empty($_REQUEST['invoice_id'])
-                && !empty($this->get_request_status())
-                && $this->checkAdvancedCheckSum()
-            ) {
+            try {
                 $arr = explode("_", $_REQUEST['invoice_id']);
 
-                if(is_array($arr) && !empty($arr)) {
-                    $order_id  = $arr[0];
+                $order = new WC_Order($arr[0]);
+                $order_status = strtolower($order->get_status());
+                
+                $order->update_meta_data(SC_GW_P3D_RESP_TR_TYPE, $_REQUEST['transactionType']);
 
-                    try {
-                        $order = new WC_Order($order_id);
-                        $order_status = strtolower($order->get_status());
-
-                        if(strtolower($this->get_request_status()) == 'pending' && $order_status == 'completed') {
-                            // do nothing here
-                        }
-                        else {
-                            $this->change_order_status($order, $order_id, $this->get_request_status(), @$_REQUEST['transactionType']);
-                        }
-                    }
-                    catch (Exception $ex) {
-                        $this->create_log($ex->getMessage(), 'process_dmns() Cashier DMN Exception: ');
-                        echo 'Exception - probably invalid order number. ';
-                        exit;
-                        
-                    }
+                // old code
+//                if($order_status == 'pending' && $order_status == 'completed') {
+//                    // do nothing here
+//                }
+//                else {
+//                    $this->change_order_status($order, $arr[0], $req_status, $_REQUEST['transactionType']);
+//                }
+                
+                if($order_status != 'completed') {
+                    $this->change_order_status($order, $arr[0], $req_status, $_REQUEST['transactionType']);
                 }
-                else {
-                    $this->create_log($_REQUEST["invoice_id"], '$_REQUEST["invoice_id"] is not proper format.');
-                    echo '$_REQUEST["invoice_id"] is not proper format.';
-                    exit;
-                }
+            }
+            catch (Exception $ex) {
+                $this->create_log($ex->getMessage(), 'Cashier DMN Exception: ');
+                echo 'DMN Exception.';
+                exit;
             }
             
             echo 'DMN received.';
@@ -1006,11 +1006,12 @@ class WC_SC extends WC_Payment_Gateway
         
         # Void, Settle
         if(
-            $req_status != ''
-            && isset($_REQUEST['clientUniqueId'])
+            isset($_REQUEST['clientUniqueId'], $_REQUEST['transactionType'])
             && $_REQUEST['clientUniqueId'] != ''
-            && (@$_REQUEST['transactionType'] == 'Void' || @$_REQUEST['transactionType'] == 'Settle')
+            && ($_REQUEST['transactionType'] == 'Void' || $_REQUEST['transactionType'] == 'Settle')
         ) {
+            $this->create_log('', $_REQUEST['transactionType']);
+            
             try {
                 $order = new WC_Order($_REQUEST['clientUniqueId']);
                 $this->change_order_status($order, $_REQUEST['clientUniqueId'], $req_status, $_REQUEST['transactionType']);
@@ -1034,6 +1035,8 @@ class WC_SC extends WC_Payment_Gateway
             (@$_REQUEST['action'] == 'refund' || @$_REQUEST['transactionType'] == 'Credit')
             && !empty($req_status)
         ) {
+            $this->create_log('', 'Refund.');
+            
             // CPanel DMN, from it we do not recieve $_GET['action'] parameter
             if(
                 @$_REQUEST['action'] != 'refund'
@@ -1130,6 +1133,8 @@ class WC_SC extends WC_Payment_Gateway
         # D3D and P3D payment
         // the idea here is to get $_REQUEST['paResponse'] and pass it to P3D
         elseif(@$_REQUEST['action'] == 'p3d') {
+            $this->create_log('', 'p3d.');
+            
             // the DMN from step 1 - issuer/bank
             if(
                 isset($_SESSION['SC_P3D_Params'], $_REQUEST['PaRes'])
@@ -1169,6 +1174,8 @@ class WC_SC extends WC_Payment_Gateway
         
         # other cases
         if(!isset($_REQUEST['action']) && $this->checkAdvancedCheckSum()) {
+            $this->create_log('', 'Other cases.');
+            
             try {
                 $order = new WC_Order(@$_REQUEST['clientUniqueId']);
 

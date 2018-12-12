@@ -122,7 +122,7 @@ function sc_show_final_text()
 
                 $msg = __("Your payment failed. Please, try again.", 'sc');
             }
-            else{
+            else {
                 $transactionId = "TransactionId = "
                     . (isset($_REQUEST['TransactionID']) ? $_REQUEST['TransactionID'] : "");
 
@@ -285,7 +285,7 @@ function sc_add_buttons()
                 . '\'settle\', ' . $_REQUEST['post'] .')" class="button generate-items">'
                 . __( 'Settle', 'sc' ) .'</button>';
         }
-
+        
         $checksum = hash(
             $wc_sc->settings['hash_type'],
             $wc_sc->settings['merchantId']
