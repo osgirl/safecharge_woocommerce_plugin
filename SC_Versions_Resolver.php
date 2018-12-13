@@ -126,6 +126,8 @@ class SC_Versions_Resolver
      * 
      * @param string $page
      * @return string|false
+     * 
+     * @deprecated
      */
     public static function get_page_id($page)
     {
@@ -138,6 +140,8 @@ class SC_Versions_Resolver
      * 
      * @param WC_Order $order
      * @return string
+     * 
+     * @deprecated
      */
     public static function get_redirect_url($order)
     {

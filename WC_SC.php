@@ -408,8 +408,8 @@ class WC_SC extends WC_Payment_Gateway
 		$params['encoding'] ='utf8';
 		$params['version'] = '4.0.0';
 
-        $payment_page = SC_Versions_Resolver::get_page_id($order, 'pay');
-    //    $payment_page = wc_get_page_permalink($page);
+    //    $payment_page = SC_Versions_Resolver::get_page_id($order, 'pay');
+        $payment_page = wc_get_page_permalink($order);
         
 		if ( get_option( 'woocommerce_force_ssl_checkout' ) == 'yes' ) {
             $payment_page = str_replace( 'http:', 'https:', $payment_page );
@@ -734,8 +734,9 @@ class WC_SC extends WC_Payment_Gateway
                     
                     // case 1
                     if(
-                        isset($resp['acsUrl']) && !empty($resp['acsUrl'])
-                        && isset($resp['threeDFlow']) && intval($resp['threeDFlow']) == 1
+                        isset($resp['acsUrl'], $resp['threeDFlow'])
+                        && !empty($resp['acsUrl'])
+                        && intval($resp['threeDFlow']) == 1
                     ) {
                         
                         $this->create_log('', 'D3D case 1.');
@@ -792,12 +793,18 @@ class WC_SC extends WC_Payment_Gateway
                 $order->set_status('completed');
             }
             
-            if(@$resp['transactionId']) {
+            if(isset($resp['transactionId']) && $resp['transactionId'] != '') {
                 $order->add_order_note(__('Payment succsess for Transaction Id ', 'sc') . $resp['transactionId']);
             }
             else {
                 $order->add_order_note(__('Payment succsess.'));
             }
+            
+            // save the response transactionType value
+            if(isset($resp['transactionType']) && $resp['transactionType'] != '') {
+                $order->update_meta_data(SC_GW_P3D_RESP_TR_TYPE, $resp['transactionType']);
+            }
+            
             $order->save();
             
             echo 
@@ -935,15 +942,14 @@ class WC_SC extends WC_Payment_Gateway
        
         return array(
             'result' 	=> 'success',
-            'redirect'	=> SC_Versions_Resolver::get_redirect_url($order),
-//            'redirect'	=> add_query_arg(
-//                array(
-//                    'order-pay' => $this->get_order_data($order, 'id'),
-//                    'key' => $this->get_order_data($order, 'order_key')
-//                ),
-//            //    self::get_page_id('pay')
-//                wc_get_page_permalink('pay')
-//            )
+        //    'redirect'	=> SC_Versions_Resolver::get_redirect_url($order),
+            'redirect'	=> add_query_arg(
+                array(
+                    'order-pay' => $this->get_order_data($order, 'id'),
+                    'key' => $this->get_order_data($order, 'order_key')
+                ),
+                wc_get_page_permalink('pay')
+            )
         );
     }
     
@@ -1128,7 +1134,7 @@ class WC_SC extends WC_Payment_Gateway
         elseif(@$_REQUEST['action'] == 'p3d') {
             $this->create_log('', 'p3d.');
             
-            // the DMN from step 1 - issuer/bank
+            // the DMN from case 1 - issuer/bank
             if(
                 isset($_SESSION['SC_P3D_Params'], $_REQUEST['PaRes'])
                 && is_array($_SESSION['SC_P3D_Params'])
@@ -1136,7 +1142,7 @@ class WC_SC extends WC_Payment_Gateway
                 $_SESSION['SC_P3D_Params']['paResponse'] = $_REQUEST['PaRes'];
                 $this->pay_with_d3d_p3d();
             }
-            // the DMN form step 2 - p3d
+            // the DMN from case 2 - p3d
             elseif(isset($_REQUEST['merchantId'], $_REQUEST['merchantSiteId'])) {
                 // here we must unset $_SESSION['SC_P3D_Params'] as last step
                 try {
