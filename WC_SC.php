@@ -422,7 +422,7 @@ class WC_SC extends WC_Payment_Gateway
 		$params['invoice_id']           = $order_id.'_'.$TimeStamp;
 		$params['merchant_unique_id']   = $order_id;
         
-        // get and pass to cashier billing data
+        // get and pass billing data
 		$params['first_name'] =
             urlencode(preg_replace("/[[:punct:]]/", '', SC_Versions_Resolver::get_order_data($order, 'billing_first_name')));
         //    urlencode(preg_replace("/[[:punct:]]/", '', $this->get_order_data($order, 'billing_first_name')));
@@ -445,9 +445,9 @@ class WC_SC extends WC_Payment_Gateway
 		
         $params['email']            = SC_Versions_Resolver::get_order_data($order, 'billing_email');
         $params['user_token_id']    = SC_Versions_Resolver::get_order_data($order, 'billing_email');
-        // get and pass to cashier billing data END
+        // get and pass billing data END
         
-        // get and pass to cashier hipping data
+        // get and pass shipping data
         $sh_f_name = urlencode(preg_replace(
             "/[[:punct:]]/", '', SC_Versions_Resolver::get_order_data($order, 'shipping_first_name')));
         
@@ -491,7 +491,7 @@ class WC_SC extends WC_Payment_Gateway
             $sh_zip = $params['zip'];
         }
         $params['shippingZip'] = $sh_zip;
-        // get and pass to cashier hipping data END
+        // get and pass shipping data END
         
         $params['user_token'] = "auto";
         
@@ -500,20 +500,19 @@ class WC_SC extends WC_Payment_Gateway
             $params['payment_method'] = str_replace($this->id.'_', '', $_SESSION['sc_subpayment']);
         }
 		
-        $params['merchantLocale']   = $this->formatLocation(get_locale());
         $params['total_amount']     = SC_Versions_Resolver::get_order_data($order, 'order_total');
         $params['currency']         = get_woocommerce_currency();
         $params['merchantLocale']   = get_locale();
         
-        $for_hash = '';
-		foreach($params as $k => $v) {
-            if(!is_array($v)) {
-                $for_hash .= $v;
-            }
-		}
-        
         # Cashier payment
         if($this->payment_api == 'cashier') {
+            $for_hash = '';
+            foreach($params as $k => $v) {
+                if(!is_array($v)) {
+                    $for_hash .= $v;
+                }
+            }
+            
             $params['checksum'] = hash($this->hash_type, stripslashes($this->secret . $for_hash));
             
             $params_array = array();
