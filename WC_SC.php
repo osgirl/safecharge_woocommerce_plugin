@@ -332,19 +332,18 @@ class WC_SC extends WC_Payment_Gateway
         
     //    $this->create_log($order, "the order data: ");
         
-        $order->add_order_note("User is redicted to ".SC_GATEWAY_TITLE." Payment page.");
+        $order->add_order_note(__("User is redicted to ".SC_GATEWAY_TITLE." Payment page.", 'sc'));
         $order->save();
         
-		$items = $order->get_items();
-		$i = 1;
-		
         $this->set_environment();
-        
         $notify_url = $this->set_notify_url();
         
         $params['site_url'] = get_site_url();
         // easy way to pass them to REST API
         $params['items'] = array();
+        
+        $items = $order->get_items();
+		$i = 1;
 		
         foreach ( $items as $item ) {
 			$params['item_name_'.$i]        = $item['name'];

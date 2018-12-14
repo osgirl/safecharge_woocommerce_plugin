@@ -4,6 +4,7 @@
  * Put all Constants here.
  * 
  * 2018
+ * 
  * SafeCharge
  */
 
@@ -130,10 +131,9 @@ define('SC_DEVICES_TYPES', json_encode(array('tablet', 'mobile', 'tv', 'windows'
 // list of devices OSs
 define('SC_DEVICES_OS', json_encode(array('android', 'windows', 'linux', 'mac os')));
 
-# OPTIONAL CONSTANTS FOR WC
-
 // some keys for order metadata, we make them hiden when starts with underscore
 define('SC_AUTH_CODE_KEY', '_authCode');
 define('SC_GW_TRANS_ID_KEY', '_relatedTransactionId');
 define('SC_GW_P3D_RESP_TR_TYPE', '_p3dRespTransactionType');
+
 define('SC_LOG_FILE_PATH', dirname( __FILE__ ). DIRECTORY_SEPARATOR . 'logs'. DIRECTORY_SEPARATOR. date("Y-m-d"). '.txt');
