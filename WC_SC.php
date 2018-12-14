@@ -420,7 +420,7 @@ class WC_SC extends WC_Payment_Gateway
 		$params['back_url']             = $payment_page;
 		$params['notify_url']           = $notify_url . 'sc_listener';
 		$params['invoice_id']           = $order_id.'_'.$TimeStamp;
-		$params['merchant_unique_id']   = $order_id.'_'.$TimeStamp;
+		$params['merchant_unique_id']   = $order_id;
         
         // get and pass to cashier billing data
 		$params['first_name'] =
