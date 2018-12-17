@@ -961,10 +961,6 @@ class WC_SC extends WC_Payment_Gateway
         $this->create_log(@$_REQUEST, 'Receive DMN with params: ');
         
         $req_status = $this->get_request_status();
-        if($req_status == '') {
-            echo 'Error: the DMN Status is empty!';
-            exit;
-        }
         
         # Cashier sale, the invoice_id parameter has value
         if(
@@ -1194,6 +1190,11 @@ class WC_SC extends WC_Payment_Gateway
             }
             
             echo 'DMN received.';
+            exit;
+        }
+        
+        if($req_status == '') {
+            echo 'Error: the DMN Status is empty!';
             exit;
         }
         

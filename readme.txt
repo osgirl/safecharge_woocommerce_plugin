@@ -3,7 +3,7 @@
 Tags: credit card, safecharge, woocommerce
 Wordpress requirements: 
 	- minimum v4.7
-	- tested up to v5.0.0
+	- tested up to v5.0.1
 WooCommerce requirements: 
 	- minimum v 3.0
 	- tested up to v3.5.2
@@ -71,7 +71,7 @@ Please, contact out Tech-Support team (tech-support@safecharge.com) in case of q
 * Add - Independent SC_REST_API class from the main shopping system.
 
 = 1.3.1 - 2018-10-17 =
-* Add - Added SC Novo Mobile theme for the APM fields.
+* Add - Added SC Novo Mobile like theme for the APM fields.
 
 = 1.3 - 2018-10-02 =
 * Add - Work with REST API payments integration.
