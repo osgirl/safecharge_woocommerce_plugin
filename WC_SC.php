@@ -330,8 +330,6 @@ class WC_SC extends WC_Payment_Gateway
         $cust_fields = $order->get_meta_data();
         $cust_fields2 = get_post_meta($order_id, 'payment_method_sc', true);
         
-    //    $this->create_log($order, "the order data: ");
-        
         $order->add_order_note(__("User is redicted to ".SC_GATEWAY_TITLE." Payment page.", 'sc'));
         $order->save();
         
@@ -506,6 +504,9 @@ class WC_SC extends WC_Payment_Gateway
         
         # Cashier payment
         if($this->payment_api == 'cashier') {
+            // specified parameter for the Cashier
+            $params['webMasterId'] = WOOCOMMERCE_VERSION;
+            
             $for_hash = '';
             foreach($params as $k => $v) {
                 if(!is_array($v)) {

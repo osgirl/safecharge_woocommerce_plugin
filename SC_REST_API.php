@@ -318,16 +318,18 @@ class SC_REST_API
         ) {
             self::create_log($session_token_data, 'Session Token is FALSE.');
             
+            $resp = array(
+                'status' => 0,
+                'msg' => 'No Session Token',
+                'ses_t_data' => json_encode($session_token_data),
+            );
+            
             if($is_ajax) {
-                echo json_encode(array(
-                    'status' => 0,
-                    'msg' => 'No Session Token',
-                    'ses_t_data' => json_encode($session_token_data),
-                ));
+                echo json_encode($resp);
                 exit;
             }
             
-            return json_encode(array('status' => 0, 'msg' => 'No Session Token'));
+            return json_encode($resp);
         }
         
         $session_token = $session_token_data['sessionToken'];
@@ -567,7 +569,7 @@ class SC_REST_API
             self::create_log($e->getMessage(), 'Getting SessionToken Exception ERROR: ');
             
             if($is_ajax) {
-                echo json_encode(array('status' => 0));
+                echo json_encode(array('status' => 0, 'msg' => $e->getMessage()));
                 exit;
             }
             
