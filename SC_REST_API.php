@@ -316,7 +316,7 @@ class SC_REST_API
             || empty($session_token_data['sessionToken'])
             || !is_string($session_token_data['sessionToken'])
         ) {
-            self::create_log($session_token, 'Session Token is FALSE.');
+            self::create_log($session_token_data, 'Session Token is FALSE.');
             
             if($is_ajax) {
                 echo json_encode(array(
