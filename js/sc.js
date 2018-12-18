@@ -174,10 +174,13 @@ function getAPMs() {
             data: { country: jQuery("#billing_country").val() },
             dataType: 'json'
         })
-            .done(function(resp){
+            .done(function(resp) {
+                if(resp === null) {
+                    return;
+                }
+        
                 if(
                     typeof resp != 'undefined'
-                    && resp !== null
                     && resp.status == 1
                     && typeof resp.data['paymentMethods'] != 'undefined'
                     && resp.data['paymentMethods'].length > 0
