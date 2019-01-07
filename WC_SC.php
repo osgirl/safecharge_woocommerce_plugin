@@ -37,8 +37,6 @@ class WC_SC extends WC_Payment_Gateway
 		$this->init_form_fields();
 		$this->init_settings();
         
-        //var_dump($this->settings);die;
-        
 		$this->title            = @$this->settings['title'] ? $this->settings['title'] : '';
 		$this->description      = @$this->settings['description'] ? $this->settings['description'] : '';
 		$this->merchantId       = @$this->settings['merchantId'] ? $this->settings['merchantId'] : '';
@@ -52,10 +50,13 @@ class WC_SC extends WC_Payment_Gateway
 		$this->payment_api      = @$this->settings['payment_api'] ? $this->settings['payment_api'] : 'cashier';
 		$this->transaction_type = @$this->settings['transaction_type'] ? $this->settings['transaction_type'] : 'sale';
 		$this->rewrite_dmn      = @$this->settings['rewrite_dmn'] ? $this->settings['rewrite_dmn'] : 'no';
-		$this->use_wpml_thanks_page =
+		
+        $this->use_wpml_thanks_page =
             @$this->settings['use_wpml_thanks_page'] ? $this->settings['use_wpml_thanks_page'] : 'no';
-        // to enable auto refund support
-        $this->supports         = array('products', 'refunds');
+        $this->cashier_in_iframe    =
+            @$this->settings['cashier_in_iframe'] ? $this->settings['cashier_in_iframe'] : 'no';
+        
+        $this->supports         = array('products', 'refunds'); // to enable auto refund support
         
         # set session variables for REST API, according REST variables names
         $_SESSION['SC_Variables']['merchantId']         = $this->merchantId;
@@ -185,6 +186,12 @@ class WC_SC extends WC_Payment_Gateway
                 'label' => __('Enable test mode', 'sc'),
                 'default' => 'no'
             ),
+            'cashier_in_iframe' => array(
+                'title' => __('Cashier in IFrame', 'sc'),
+                'type' => 'checkbox',
+                'label' => __('When use Cashier as Payment API, open it in iFrame, instead redirecting.', 'sc'),
+                'default' => 'no'
+            ),
             'use_http' => array(
                 'title' => __('Use HTTP', 'sc'),
                 'type' => 'checkbox',
@@ -242,7 +249,8 @@ class WC_SC extends WC_Payment_Gateway
      * 
      * @return string
      */
-    public function generate_button_html( $key, $data ) {
+    public function generate_button_html( $key, $data )
+    {
         $field    = $this->plugin_id . $this->id . '_' . $key;
         $defaults = array(
             'class'             => 'button-secondary',
@@ -298,7 +306,7 @@ class WC_SC extends WC_Payment_Gateway
             echo wpautop(wptexturize($this->description));
         }
         
-        // echo here some html part if needed
+        // echo here some html if needed
     }
 
 	/**
@@ -322,6 +330,11 @@ class WC_SC extends WC_Payment_Gateway
     public function generate_sc_form($order_id)
     {
         global $woocommerce;
+        
+        // prevent generate_sc_form() to render form twice
+        if(!isset($_SESSION['SC_CASHIER_FORM_RENDED'])) {
+            $_SESSION['SC_CASHIER_FORM_RENDED'] = false;
+        }
         
 		$TimeStamp = date('Ymdhis');
         $order = new WC_Order($order_id);
@@ -411,10 +424,13 @@ class WC_SC extends WC_Payment_Gateway
 		if ( get_option( 'woocommerce_force_ssl_checkout' ) == 'yes' ) {
             $payment_page = str_replace( 'http:', 'https:', $payment_page );
         }
+        
+        $return_url = $this->get_return_url();
+        $return_url .= '?use_iframe=1';
 		
-        $params['success_url']          = $this->get_return_url();
-		$params['pending_url']          = $this->get_return_url();
-		$params['error_url']            = $this->get_return_url();
+        $params['success_url']          = $return_url;
+		$params['pending_url']          = $return_url;
+		$params['error_url']            = $return_url;
 		$params['back_url']             = $payment_page;
 		$params['notify_url']           = $notify_url . 'sc_listener';
 		$params['invoice_id']           = $order_id.'_'.$TimeStamp;
@@ -503,7 +519,10 @@ class WC_SC extends WC_Payment_Gateway
         $params['merchantLocale']   = get_locale();
         
         # Cashier payment
-        if($this->payment_api == 'cashier') {
+        if(
+            $this->payment_api == 'cashier'
+            && (!isset($_SESSION['SC_CASHIER_FORM_RENDED']) || !$_SESSION['SC_CASHIER_FORM_RENDED'])
+        ) {
             // specified parameter for the Cashier
             $params['webMasterId'] = WOOCOMMERCE_VERSION;
             
@@ -527,10 +546,15 @@ class WC_SC extends WC_Payment_Gateway
             $this->create_log($for_hash, '$for_hash: ');
             $this->create_log($this->hash_type, '$this->hash_type: ');
             $this->create_log($params, 'Order params');
-
-            $html =
-                '<form action="'.$this->URL.'" method="post" id="sc_payment_form">'
-                    .implode('', $params_array)
+            
+            $html = '<form action="'.$this->URL.'" method="post" id="sc_payment_form">';
+            
+            if($this->cashier_in_iframe == 'yes') {
+                $html = '<form action="'.$this->URL.'" method="post" id="sc_payment_form" target="i_frame">';
+            }
+            
+            $html .=
+                    implode('', $params_array)
                     .'<noscript>'
                         .'<input type="submit" class="button-alt" id="submit_sc_payment_form" value="'.__('Pay via '. SC_GATEWAY_TITLE, 'sc').'" /><a class="button cancel" href="'.$order->get_cancel_order_url().'">'.__('Cancel order &amp; restore cart', 'sc').'</a>'
                     .'</noscript>'
@@ -559,7 +583,12 @@ class WC_SC extends WC_Payment_Gateway
                         .'});'
                     .'</script>'
                 .'</form>';
+            
+            if($this->cashier_in_iframe == 'yes') {
+                $html .= '<iframe name="i_frame" onLoad=""; style="width: 100%; height: 1000px;"></iframe>';
+            }
 
+            $_SESSION['SC_CASHIER_FORM_RENDED'] = true;
             echo $html;
         }
         # REST API payment
@@ -567,11 +596,11 @@ class WC_SC extends WC_Payment_Gateway
             // map here variables names different for Cashier and REST
             $params['merchantId'] = $this->merchantId;
             $params['merchantSiteId'] = $this->merchantSiteId;
-        //    $params['notify_url'] = $notify_url . 'WC_SC_Rest';
             $params['notify_url'] = $notify_url . 'sc_listener';
-            // map here variables names different for Cashier and REST END
             
             $params['client_request_id'] = $TimeStamp .'_'. uniqid();
+            // specified parameter for the Cashier
+            $params['sg_WebMasterID'] = WOOCOMMERCE_VERSION;
             
             $params['urlDetails'] = array(
                 'successUrl'        => $this->get_return_url(),

@@ -3,11 +3,11 @@
 Tags: credit card, safecharge, woocommerce
 Wordpress requirements: 
 	- minimum v4.7
-	- tested up to v5.0.1
+	- tested up to v5.0.2
 WooCommerce requirements: 
 	- minimum v 3.0
 	- tested up to v3.5.2
-Stable tag: 1.7
+Stable tag: 1.8.2
 
 == Description ==
 
@@ -38,9 +38,12 @@ Upload the provided archive and install it. As a final step you should activate 
 
 == Support ==
 
-Please, contact out Tech-Support team (tech-support@safecharge.com) in case of questions and difficulties. 
+Please, contact out Tech-Support team (tech-support@safecharge.com) in case of questions and difficulties.
 
 == Changelog ==
+
+= 1.8.2 - 2018-12-19 =
+* New - Added option in the settings, to use Cashier in iFrame.
 
 = 1.8.1 - 2018-11-28 =
 * New - Option in Admin to rewrite DMN URL and redirect to new one. This helps when the user have 404 page problem with "+", " " and "%20" symbols in the URL. Support of WP WPML and WC WPML plugins. Button in Admin to delete oldest logs, but kept last 30 of them.

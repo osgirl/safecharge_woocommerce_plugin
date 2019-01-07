@@ -3,7 +3,7 @@
 Plugin Name: SafeCharge WooCommerce PlugIn
 Plugin URI: http://www.safecharge.com
 Description: SafeCharge gateway for woocommerce
-Version: 1.8.1
+Version: 1.8.2
 Author: SafeCharge
 Author URI: http://safecharge.com
 */
@@ -142,16 +142,30 @@ function sc_show_final_text()
     }
     // REST API tahnk you page handler
     else{
-        if ( strtolower($_REQUEST['Status']) == 'fail' ) {
+        if ( strtolower(@$_REQUEST['Status']) == 'fail' ) {
             $msg = __("Your payment failed. Please, try again.", 'sc');
         }
         else {
             $woocommerce -> cart -> empty_cart();
         }
     }
+    
     // clear session variables for the order
     if(isset($_SESSION['SC_Variables'])) {
         unset($_SESSION['SC_Variables']);
+    }
+    // prevent generate_sc_form() to render form twice
+    if(isset($_SESSION['SC_CASHIER_FORM_RENDED'])) {
+        unset($_SESSION['SC_CASHIER_FORM_RENDED']);
+    }
+    
+    // when we use iframe
+    if(@$_REQUEST['use_iframe'] == 1 && $wc_sc->checkAdvancedCheckSum()) {
+        echo
+            '<script type="text/javascript">'
+                .'window.top.location.href = window.location.href.replace("use_iframe=1&", "");'
+            .'</script>';
+        exit;
     }
     
     echo $msg;
