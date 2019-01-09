@@ -526,12 +526,10 @@ class WC_SC extends WC_Payment_Gateway
             // specified parameter for the Cashier
             $params['webMasterId'] = WOOCOMMERCE_VERSION;
             
-            $for_hash = '';
-            foreach($params as $k => $v) {
-                if(!is_array($v)) {
-                    $for_hash .= $v;
-                }
-            }
+            // this parameter is for the REST API
+            unset($params['items']);
+            // be sure there are no array elements in $params !!!
+            $for_hash = implode('', $params);
             
             $params['checksum'] = hash($this->hash_type, stripslashes($this->secret . $for_hash));
             
@@ -1563,7 +1561,7 @@ class WC_SC extends WC_Payment_Gateway
     
     /**
      * Function change_order_status
-     * Change order status of the order.
+     * Change the status of the order.
      * 
      * @param object $order
      * @param int $order_id

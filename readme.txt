@@ -6,7 +6,7 @@ Wordpress requirements:
 	- tested up to v5.0.2
 WooCommerce requirements: 
 	- minimum v 3.0
-	- tested up to v3.5.2
+	- tested up to v3.5.3
 Stable tag: 1.8.2
 
 == Description ==
