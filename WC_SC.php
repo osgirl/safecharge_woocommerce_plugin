@@ -349,7 +349,6 @@ class WC_SC extends WC_Payment_Gateway
         $this->set_environment();
         $notify_url = $this->set_notify_url();
         
-        $params['site_url'] = get_site_url();
         // easy way to pass them to REST API
         $params['items'] = array();
         
@@ -528,10 +527,9 @@ class WC_SC extends WC_Payment_Gateway
             
             // this parameter is for the REST API
             unset($params['items']);
-            // be sure there are no array elements in $params !!!
-            $for_hash = implode('', $params);
             
-            $params['checksum'] = hash($this->hash_type, stripslashes($this->secret . $for_hash));
+            // be sure there are no array elements in $params !!!
+            $params['checksum'] = hash($this->hash_type, stripslashes($this->secret . implode('', $params)));
             
             $params_array = array();
             foreach($params as $key => $value) {
@@ -592,13 +590,13 @@ class WC_SC extends WC_Payment_Gateway
         # REST API payment
         elseif($this->payment_api == 'rest') {
             // map here variables names different for Cashier and REST
-            $params['merchantId'] = $this->merchantId;
-            $params['merchantSiteId'] = $this->merchantSiteId;
-            $params['notify_url'] = $notify_url . 'sc_listener';
+            $params['merchantId']           = $this->merchantId;
+            $params['merchantSiteId']       = $this->merchantSiteId;
+            $params['notify_url']           = $notify_url . 'sc_listener';
             
-            $params['client_request_id'] = $TimeStamp .'_'. uniqid();
-            // specified parameter for the Cashier
-            $params['sg_WebMasterID'] = WOOCOMMERCE_VERSION;
+            $params['site_url']             = get_site_url(); // TODO this parameter does not present in REST docs !!!
+            $params['client_request_id']    = $TimeStamp .'_'. uniqid();
+            $params['sg_WebMasterID']       = WOOCOMMERCE_VERSION;
             
             $params['urlDetails'] = array(
                 'successUrl'        => $this->get_return_url(),
@@ -1075,23 +1073,21 @@ class WC_SC extends WC_Payment_Gateway
                 
                 if(is_a($resp, 'WP_Error')) {
                     $this->create_log($resp->errors['error'][0], 'Order was not refunded: ');
-
-                    $order->add_order_note(__('DMN message: Your Refund request for Order #'
-                        . $order_id . ', faild with ERROR: '
-                        . $resp->errors['error'][0]));
+                    
+                    $order->add_order_note(
+                        __('DMN message: Your Refund request for Order #'
+                            . $order_id . ', faild with ERROR: ' . $resp->errors['error'][0], 'sc')
+                    );
+                    $order->save();
                 }
                 elseif(is_a($resp, 'WC_Order_Refund')) {
-                    $this->create_log('', 'Order was refunded.');
+                    $this->create_log('', 'Refunded amount success.');
 
-                    if(@$_REQUEST['requestedAmount'] == $order->get_total()) {
-                        $order->update_status('refunded');
-                    }
-                    
-                    $order -> add_order_note(__('DMN message: Your Refund #'
-                        . $resp->get_id() .' was successful.', 'sc'));
+                    $this->change_order_status($order, $order_id, 'APPROVED', 'Credit', array(
+                        'resp_id'           => $resp->get_id(),
+                        'requestedAmount'   => @$_REQUEST['requestedAmount']
+                    ));
                 }
-
-                $order->save();
 
                 echo 'DMN received.';
                 exit;
@@ -1113,7 +1109,6 @@ class WC_SC extends WC_Payment_Gateway
                 && $req_status == 'SUCCESS'
                 && @$_REQUEST['transactionStatus'] == 'APPROVED'
             ) {
-            //    $order->update_status('refunded');
                 $order -> add_order_note(__('DMN message: Your request - Refund #' .
                     $_REQUEST['clientUniqueId'] . ', was successful.', 'sc'));
 
@@ -1600,9 +1595,21 @@ class WC_SC extends WC_Payment_Gateway
             case 'APPROVED':
                 if($transactionType == 'Void') {
                     $order->add_order_note(__('DMN message: Your Void request was success, Order #'
-                        .$_REQUEST['clientUniqueId'] . ' was canceld.', 'sc'));
+                        . @$_REQUEST['clientUniqueId'] . ' was canceld.', 'sc'));
 
                     $order->update_status('cancelled');
+                    break;
+                }
+                
+                // Refun Approved
+                if($transactionType == 'Credit') {
+                    if($res_args['requestedAmount'] && $res_args['requestedAmount'] == $order->get_total()) {
+                        $order->update_status('refunded');
+                    }
+                    
+                    $order->add_order_note(
+                        __('DMN message: Your Refund #' . $res_args['resp_id'] .' was successful.', 'sc')
+                    );
                     $order->save();
                     break;
                 }
@@ -1643,41 +1650,43 @@ class WC_SC extends WC_Payment_Gateway
 
             case 'ERROR':
             case 'DECLINED':
-                if($transactionType == 'Void') {
-                    $msg = 'DMN message: Your Void request fail with message: "';
-
-                    // in case DMN URL was rewrited all spaces were replaces with "_"
-                    if(@$_REQUEST['wc_sc_redirected'] == 1) {
-                        $msg .= str_replace('_', ' ', @$_REQUEST['message']);
-                    }
-                    else {
-                        $msg .= @$_REQUEST['msg'];
-                    }
-
-                    $msg .= '". Order #'  . $_REQUEST['clientUniqueId']
-                        .' was not canceld!';
-
-                    $order -> add_order_note(__($msg, 'sc'));
-                    $order->save();
-                    break;
-                }
-                
-                $message ='Payment failed. PPP_TransactionID = '. @$request['PPP_TransactionID']
+                $message = 'Payment failed. PPP_TransactionID = '. @$request['PPP_TransactionID']
                     .", Status = ". $status .", Error code = ". @$request['ErrCode']
                     .", Message = ". @$request['message']
                     .", Reason = ". @$request['reason'];
-
+                
                 if($transactionType) {
                     $message .= ", TransactionType = ". $transactionType;
                 }
 
                 $message .= ', GW_TransactionID = '. @$request['TransactionID'];
+                
+                // do not change status
+                if($transactionType == 'Void') {
+                    $message = 'DMN message: Your Void request fail with message: "';
 
+                    // in case DMN URL was rewrited all spaces were replaces with "_"
+                    if(@$_REQUEST['wc_sc_redirected'] == 1) {
+                        $message .= str_replace('_', ' ', @$_REQUEST['message']);
+                    }
+                    else {
+                        $message .= @$_REQUEST['msg'];
+                    }
+
+                    $message .= '". Order #'  . $_REQUEST['clientUniqueId']
+                        .' was not canceld!';
+                    
+                    $order->add_order_note(__($message, 'sc'));
+                    $order->save();
+                    break;
+                }
+                
                 $this->msg['message'] = $message;
                 $this->msg['class'] = 'woocommerce_message';
+                
                 $order->update_status('failed');
-                $order->add_order_note('Failed');
-                $order->add_order_note($this->msg['message']);
+                $order->add_order_note(__($message, 'sc'));
+                $order->save();
             break;
 
             case 'PENDING':
