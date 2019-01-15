@@ -212,11 +212,87 @@ function sc_create_refund()
                 ,get_woocommerce_currency()
                 ,$notify_url . 'sc_listener&action=refund&order_id=' . $_REQUEST['order_id']
             );
+            
+            $refund_url = SC_TEST_REFUND_URL;
+            $cpanel_url = SC_TEST_CPANEL_URL;
 
-            $order->add_order_note(__($resp['msg'], 'sc'));
+            if($wc_sc->settings['test'] == 'no') {
+                $refund_url = SC_LIVE_REFUND_URL;
+                $cpanel_url = SC_LIVE_CPANEL_URL;
+            }
+            
+            $msg = '';
+            $error_note = 'Please manually delete request Refund #'
+                .$refunds[0]->data['id'].' form the order or login into <i>'. $cpanel_url
+                .'</i> and refund Transaction ID '.$order_meta_data['order_tr_id'];
 
-            create_log($resp, 'Refund response from sc_create_refund(): ');
+            if($json_arr === false) {
+                $msg = 'The REST API retun false. ' . $error_note;
+                
+                $order->add_order_note(__($msg, 'sc'));
+                $order->save();
+                wp_send_json_success();
+            }
 
+            if(!is_array($json_arr)) {
+                parse_str($resp, $json_arr);
+            }
+
+            if(!is_array($json_arr)) {
+                $msg = 'Invalid API response. ' . $error_note;
+                
+                $order->add_order_note(__($msg, 'sc'));
+                $order->save();
+                wp_send_json_success();
+            }
+
+            // the status of the request is ERROR
+            if(@$json_arr['status'] == 'ERROR') {
+                $msg = 'Request ERROR - "' . $json_arr['reason'] .'" '. $error_note;
+                
+                $order->add_order_note(__($msg, 'sc'));
+                $order->save();
+                wp_send_json_success();
+            }
+
+            // the status of the request is SUCCESS, check the transaction status
+            if(@$json_arr['transactionStatus'] == 'ERROR') {
+                if(isset($json_arr['gwErrorReason']) && !empty($json_arr['gwErrorReason'])) {
+                    $msg = $json_arr['gwErrorReason'];
+                }
+                elseif(isset($json_arr['paymentMethodErrorReason']) && !empty($json_arr['paymentMethodErrorReason'])) {
+                    $msg = $json_arr['paymentMethodErrorReason'];
+                }
+                else {
+                    $msg = 'Transaction error';
+                }
+                
+                $msg .= '. ' .$error_note;
+                
+                $order->add_order_note(__($msg, 'sc'));
+                $order->save();
+                wp_send_json_success();
+            }
+
+            if(@$json_arr['transactionStatus'] == 'DECLINED') {
+                $msg = 'The refun was declined. ' .$error_note;
+                
+                $order->add_order_note(__($msg, 'sc'));
+                $order->save();
+                wp_send_json_success();
+            }
+
+            if(@$json_arr['transactionStatus'] == 'APPROVED') {
+                $msg = 'Your request - Refund #' . $refunds[0]->data['id'] . ', was successful.';
+                
+                $order->add_order_note(__($msg, 'sc'));
+                $order->save();
+                wp_send_json_success();
+            }
+
+            $msg = 'The status of request - Refund #' . $refunds[0]->data['id'] . ', is UNKONOWN.';
+                
+            $order->add_order_note(__($msg, 'sc'));
             $order->save();
             wp_send_json_success();
         }
@@ -295,7 +371,7 @@ function sc_add_buttons()
         ) {
             $buttons_html .=
                 ' <button type="button" onclick="settleAndCancelOrder(\''
-                . __( 'Are you sure, you want to Settle this Order #'. $_REQUEST['post'] .'?', 'sc' ) .'\', '
+                . __( 'Are you sure, you want to Settle Order #'. $_REQUEST['post'] .'?', 'sc' ) .'\', '
                 . '\'settle\', ' . $_REQUEST['post'] .')" class="button generate-items">'
                 . __( 'Settle', 'sc' ) .'</button>';
         }

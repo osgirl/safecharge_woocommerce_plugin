@@ -97,76 +97,7 @@ class SC_REST_API
         );
         
         self::create_log($json_arr, 'Refund Response: ');
-        
-        $note = '';
-        $error_note = 'Please manually delete request Refund #'
-            .$refund['id'].' form the order or login into <i>'. $cpanel_url
-            .'</i> and refund Transaction ID '.$ord_tr_id;
-        
-        if($json_arr === false) {
-            return array(
-                'msg' => 'The REST API retun false. ' . $error_note,
-                'new_order_status' => '',
-            );
-        }
-        
-        if(!is_array($json_arr)) {
-            parse_str($resp, $json_arr);
-        }
-
-        if(!is_array($json_arr)) {
-            return array(
-                'msg' => 'Invalid API response. ' . $error_note,
-                'new_order_status' => ''
-            );
-        }
-        
-        // the status of the request is ERROR
-        if(isset($json_arr['status']) && $json_arr['status'] == 'ERROR') {
-            return array(
-                'msg' => 'Request ERROR - "' . $json_arr['reason'] .'" '. $error_note,
-                'new_order_status' => ''
-            );
-        }
-        
-        // the status of the request is SUCCESS, check the transaction status
-        if(isset($json_arr['transactionStatus']) && !empty($json_arr['transactionStatus'])) {
-            if($json_arr['transactionStatus'] == 'ERROR') {
-                if(isset($json_arr['gwErrorReason']) && !empty($json_arr['gwErrorReason'])) {
-                    $note = $json_arr['gwErrorReason'];
-                }
-                elseif(isset($json_arr['paymentMethodErrorReason']) && !empty($json_arr['paymentMethodErrorReason'])) {
-                    $note = $json_arr['paymentMethodErrorReason'];
-                }
-                else {
-                    $note = 'Transaction error';
-                }
-                
-                return array(
-                    'msg' => $note. '. ' .$error_note,
-                    'new_order_status' => ''
-                );
-            }
-            
-            if($json_arr['transactionStatus'] == 'DECLINED') {
-                return array(
-                    'msg' => 'The refun was declined. ' .$error_note,
-                    'new_order_status' => ''
-                );
-            }
-            
-            if($json_arr['transactionStatus'] == 'APPROVED') {
-                return array(
-                    'msg' => 'Your request - Refund #' . $refund['id'] . ', was successful.',
-                    'new_order_status' => 'refunded'
-                );
-            }
-        }
-        
-        return array(
-            'msg' => 'The status of request - Refund #' . $refund['id'] . ', is UNKONOWN.',
-            'new_order_status' => ''
-        );
+        return $json_arr;
     }
     
     /**

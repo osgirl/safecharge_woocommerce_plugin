@@ -1054,7 +1054,6 @@ class WC_SC extends WC_Payment_Gateway
         # Refund
         // see https://www.safecharge.com/docs/API/?json#refundTransaction -> Output Parameters
         // when we refund form CPanel we get transactionType = Credit and Status = 'APPROVED'
-        // TODO make it with change_order_status()
         if(
             (@$_REQUEST['action'] == 'refund' || @$_REQUEST['transactionType'] == 'Credit')
             && !empty($req_status)
