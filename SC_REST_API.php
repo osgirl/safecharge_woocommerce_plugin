@@ -677,6 +677,7 @@ class SC_REST_API
             $d = $title . "\r\n" . $d;
         }
         
+        // for WC only
         if(defined('SC_LOG_FILE_PATH')) {
             try {
                 file_put_contents(SC_LOG_FILE_PATH, date('H:i:s') . ': ' . $d . "\r\n"."\r\n", FILE_APPEND);
