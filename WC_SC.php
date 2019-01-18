@@ -991,7 +991,7 @@ class WC_SC extends WC_Payment_Gateway
         # Cashier sale, the invoice_id parameter has value
         if(
             isset($_REQUEST['transactionType'], $_REQUEST['invoice_id'])
-            && $_REQUEST['transactionType'] != 'Credit'
+            && $_REQUEST['transactionType'] == 'Sale'
             && !empty($_REQUEST['invoice_id'])
             && $this->checkAdvancedCheckSum()
         ) {
