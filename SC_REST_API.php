@@ -149,7 +149,7 @@ class SC_REST_API
         
         self::return_response(
             array('status' => $status, 'data' => $resp),
-            is_ajax
+            $is_ajax
         );
         exit;
     }
