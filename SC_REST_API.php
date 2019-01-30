@@ -180,7 +180,7 @@ class SC_REST_API
         }
         
         // get them only if we pass them empty
-        if(isset($params['deviceDetails'])) {
+        if(isset($params['deviceDetails']) && empty($params['deviceDetails'])) {
             $params['deviceDetails'] = self::get_device_details();
         }
         
@@ -382,6 +382,7 @@ class SC_REST_API
                 'urlDetails'        => $data['urlDetails'],
                 'timeStamp'         => $data['time_stamp'],
                 'checksum'          => $data['checksum'],
+                'deviceDetails'     => self::get_device_details()
             );
 
             // set parameters specific for the payment method
@@ -411,7 +412,6 @@ class SC_REST_API
 
                     $params['sessionToken']     = $sc_variables['lst'];
                     $params['isDynamic3D']      = 1;
-                    $params['deviceDetails']    = self::get_device_details();
                     $params['cardData']         = array(
                         'ccTempToken'       => $sc_variables['APM_data']['apm_fields']['ccCardNumber'],
                         'CVV'               => $sc_variables['APM_data']['apm_fields']['CVV'],
