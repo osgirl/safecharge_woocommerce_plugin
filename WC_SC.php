@@ -1649,10 +1649,19 @@ class WC_SC extends WC_Payment_Gateway
 
             case 'ERROR':
             case 'DECLINED':
+            case 'FAIL':
+                $reason = ', Reason = ';
+                if(isset($request['reason']) && $request['reason'] != '') {
+                    $reason .= $request['reason'];
+                }
+                elseif(isset($request['Reason']) && $request['Reason'] != '') {
+                    $reason .= $request['Reason'];
+                }
+                
                 $message = 'Payment failed. PPP_TransactionID = '. @$request['PPP_TransactionID']
-                    .", Status = ". $status .", Error code = ". @$request['ErrCode']
-                    .", Message = ". @$request['message']
-                    .", Reason = ". @$request['reason'];
+                    . ", Status = ". $status .", Error code = ". @$request['ErrCode']
+                    . ", Message = ". @$request['message']
+                    . $reason;
                 
                 if($transactionType) {
                     $message .= ", TransactionType = ". $transactionType;
