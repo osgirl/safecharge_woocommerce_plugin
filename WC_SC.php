@@ -695,10 +695,11 @@ class WC_SC extends WC_Payment_Gateway
                 // for the three cases see: https://www.safecharge.com/docs/API/?json#dynamic3D,
                 // Possible Scenarios for Dynamic 3D (isDynamic3D = 1)
                 
+                // clear the old session data
                 if(isset($_SESSION['SC_P3D_Params'])) {
                     unset($_SESSION['SC_P3D_Params']);
                 }
-                
+                // prepare the new session data
                 if($payment_method == 'd3d') {
                     $params_p3d = array(
                         'sessionToken'      => $resp['sessionToken'],
