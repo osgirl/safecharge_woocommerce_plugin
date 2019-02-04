@@ -367,17 +367,17 @@ class WC_SC extends WC_Payment_Gateway
 			$params['item_amount_'.$i]      = $item_price;
             
             // set product img url
-            $prod_img_path = '';
-            $prod_img_data = wp_get_attachment_image_src(get_post_thumbnail_id($item['product_id']));
-            if(
-                $prod_img_data
-                && is_array($prod_img_data)
-                && !empty($prod_img_data)
-                && isset($prod_img_data[0])
-                && $prod_img_data[0] != ''
-            ) {
-                $prod_img_path = str_replace($params['site_url'], '', $prod_img_data[0]);
-            }
+//            $prod_img_path = '';
+//            $prod_img_data = wp_get_attachment_image_src(get_post_thumbnail_id($item['product_id']));
+//            if(
+//                $prod_img_data
+//                && is_array($prod_img_data)
+//                && !empty($prod_img_data)
+//                && isset($prod_img_data[0])
+//                && $prod_img_data[0] != ''
+//            ) {
+//                $prod_img_path = str_replace($params['site_url'], '', $prod_img_data[0]);
+//            }
         //    $params['item_image_'.$i] = $prod_img_path;
             // set product img url END
 			
