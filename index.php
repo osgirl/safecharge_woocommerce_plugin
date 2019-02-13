@@ -245,6 +245,16 @@ function sc_create_refund()
                 $order->save();
                 wp_send_json_success();
             }
+            
+            // in case we have message but without status
+            if(!isset($json_arr['status']) && isset($json_arr['msg'])) {
+                // save response message in the History
+                $msg = 'Request Refund #' . $refunds[0]->data['id'] . ' problem: ' . $json_arr['msg'];
+
+                $order->add_order_note(__($msg, 'sc'));
+                $order->save();
+                wp_send_json_success();
+            }
 
             // the status of the request is ERROR
             if(@$json_arr['status'] == 'ERROR') {
