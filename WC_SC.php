@@ -1849,6 +1849,13 @@ class WC_SC extends WC_Payment_Gateway
         $d = '';
         
         if(is_array($data) || is_object($data)) {
+            if(isset($data['cardData']['CVV'])) {
+                $data['cardData']['CVV'] = md5($data['cardData']['CVV']);
+            }
+            if(isset($data['cardData']['cardHolderName'])) {
+                $data['cardData']['cardHolderName'] = md5($data['cardData']['cardHolderName']);
+            }
+            
             $d = print_r($data, true);
         }
         elseif(is_bool($data)) {
