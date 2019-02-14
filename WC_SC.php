@@ -1084,8 +1084,8 @@ class WC_SC extends WC_Payment_Gateway
                     $this->create_log('', 'Refunded amount success.');
 
                     $this->change_order_status($order, $order_id, 'APPROVED', 'Credit', array(
-                        'resp_id'           => $resp->get_id(),
-                        'requestedAmount'   => @$_REQUEST['requestedAmount']
+                        'resp_id'       => $resp->get_id(),
+                        'totalAmount'   => @$_REQUEST['totalAmount']
                     ));
                 }
 
@@ -1603,7 +1603,7 @@ class WC_SC extends WC_Payment_Gateway
                 
                 // Refun Approved
                 if($transactionType == 'Credit') {
-                    if($res_args['requestedAmount'] && $res_args['requestedAmount'] == $order->get_total()) {
+                    if($res_args['totalAmount'] && $res_args['totalAmount'] == $order->get_total()) {
                         $order->update_status('refunded');
                     }
                     
